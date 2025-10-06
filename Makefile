@@ -22,5 +22,8 @@ run-cli:
 run-build: build
 	./dist/gojq-mcp -f ./examples/sample.json -q '.'
 
+run-inspector: build
+	npx @modelcontextprotocol/inspector go run .
+
 run-server:
 	go run .
