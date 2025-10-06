@@ -19,6 +19,7 @@ A dual-mode JSON query tool that operates both as an **MCP (Model Context Protoc
 - [Architecture](#architecture)
 - [MCP Tool Interface](#mcp-tool-interface)
 - [Development](#development)
+- [Releases and Deployment](#releases-and-deployment)
 - [Testing](#testing)
 - [Examples](#examples)
 - [Best Practices](#best-practices)
@@ -230,6 +231,86 @@ make run-cli
 make clean
 ```
 
+## Releases and Deployment
+
+### Creating a Release
+
+The project uses GitHub Actions to automatically build and publish releases for multiple platforms when you push a version tag.
+
+**Steps to create a release:**
+
+1. **Commit your changes:**
+   ```bash
+   git add .
+   git commit -m "Prepare release v1.0.0"
+   git push origin main
+   ```
+
+2. **Create and push a version tag:**
+   ```bash
+   # Create a tag following semantic versioning
+   git tag v1.0.0
+   
+   # Push the tag to trigger the build workflow
+   git push origin v1.0.0
+   ```
+
+3. **Wait for the build**: GitHub Actions will automatically:
+   - Build binaries for all supported platforms
+   - Create a GitHub Release with the tag
+   - Attach all binaries to the release
+   - Generate release notes from commit history
+
+### Supported Platforms
+
+Each release includes binaries for:
+
+- **Linux**: amd64, arm64
+- **macOS**: amd64 (Intel), arm64 (Apple Silicon)
+- **Windows**: amd64
+
+### Binary Naming Convention
+
+Binaries are named: `gojq-mcp-{version}-{os}-{arch}`
+
+For example, version `v1.0.0` produces:
+- `gojq-mcp-v1.0.0-linux-amd64`
+- `gojq-mcp-v1.0.0-linux-arm64`
+- `gojq-mcp-v1.0.0-darwin-amd64`
+- `gojq-mcp-v1.0.0-darwin-arm64`
+- `gojq-mcp-v1.0.0-windows-amd64.exe`
+
+### Downloading Releases
+
+1. Go to the [Releases page](https://github.com/berrydev-ai/gojq-mcp/releases)
+2. Find your desired version
+3. Download the appropriate binary for your platform
+4. Make it executable (Linux/macOS): `chmod +x gojq-mcp-*`
+
+### Version Naming
+
+Follow [Semantic Versioning](https://semver.org/):
+
+- **Major version** (`v2.0.0`): Breaking changes
+- **Minor version** (`v1.1.0`): New features, backwards compatible
+- **Patch version** (`v1.0.1`): Bug fixes, backwards compatible
+- **Pre-release** (`v1.0.0-beta`, `v1.0.0-alpha.1`): Testing versions
+
+### Continuous Integration
+
+The project includes two GitHub Actions workflows:
+
+**Test Workflow** (`.github/workflows/test.yml`):
+- Runs on pushes and pull requests to `main`/`master`
+- Tests against Go 1.24 and 1.25 (all currently supported versions)
+- Ensures compatibility across supported Go versions
+
+**Build Workflow** (`.github/workflows/build.yml`):
+- Triggers only on version tags (e.g., `v*`)
+- Builds for all supported platforms
+- Creates GitHub Release with binaries attached
+- Uses Go 1.25 for all builds
+
 ## Testing
 
 The project includes comprehensive tests for the core `executeJQ` function.
@@ -358,12 +439,6 @@ Contributions are welcome! Please:
 - Follow Go conventions and run `go fmt`
 - Update documentation for API changes
 - Keep commits focused and atomic
-
-## Release Process
-
-1. Update version in `README.md` and `go.mod`
-2. Tag the release (`git tag -a vX.Y.Z -m "Release vX.Y.Z"`)
-3. Push tags (`git push origin --tags`)
 
 ## License
 
