@@ -1,0 +1,311 @@
+package main
+
+import (
+	"encoding/json"
+	"testing"
+)
+
+func TestExecuteJQ_SimpleQuery(t *testing.T) {
+	jsonData := map[string]interface{}{
+		"name": "John Doe",
+		"age":  float64(30),
+	}
+
+	result, err := executeJQ(".name", jsonData)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	expected := `"John Doe"`
+	if result != expected {
+		t.Errorf("expected %s, got %s", expected, result)
+	}
+}
+
+func TestExecuteJQ_NumericQuery(t *testing.T) {
+	jsonData := map[string]interface{}{
+		"name": "John Doe",
+		"age":  float64(30),
+	}
+
+	result, err := executeJQ(".age", jsonData)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	expected := "30"
+	if result != expected {
+		t.Errorf("expected %s, got %s", expected, result)
+	}
+}
+
+func TestExecuteJQ_ArrayAccess(t *testing.T) {
+	jsonData := map[string]interface{}{
+		"users": []interface{}{
+			map[string]interface{}{"name": "Alice"},
+			map[string]interface{}{"name": "Bob"},
+		},
+	}
+
+	result, err := executeJQ(".users[0].name", jsonData)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	expected := `"Alice"`
+	if result != expected {
+		t.Errorf("expected %s, got %s", expected, result)
+	}
+}
+
+func TestExecuteJQ_ArrayMap(t *testing.T) {
+	jsonData := map[string]interface{}{
+		"users": []interface{}{
+			map[string]interface{}{"name": "Alice", "age": float64(25)},
+			map[string]interface{}{"name": "Bob", "age": float64(30)},
+		},
+	}
+
+	result, err := executeJQ(".users[].name", jsonData)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Multiple results should be returned as an array
+	var resultArray []interface{}
+	if err := json.Unmarshal([]byte(result), &resultArray); err != nil {
+		t.Fatalf("failed to parse result as array: %v", err)
+	}
+
+	if len(resultArray) != 2 {
+		t.Errorf("expected 2 results, got %d", len(resultArray))
+	}
+
+	if resultArray[0] != "Alice" {
+		t.Errorf("expected first result to be 'Alice', got %v", resultArray[0])
+	}
+	if resultArray[1] != "Bob" {
+		t.Errorf("expected second result to be 'Bob', got %v", resultArray[1])
+	}
+}
+
+func TestExecuteJQ_NestedAccess(t *testing.T) {
+	jsonData := map[string]interface{}{
+		"user": map[string]interface{}{
+			"address": map[string]interface{}{
+				"city": "Springfield",
+			},
+		},
+	}
+
+	result, err := executeJQ(".user.address.city", jsonData)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	expected := `"Springfield"`
+	if result != expected {
+		t.Errorf("expected %s, got %s", expected, result)
+	}
+}
+
+func TestExecuteJQ_FilterWithSelect(t *testing.T) {
+	jsonData := map[string]interface{}{
+		"users": []interface{}{
+			map[string]interface{}{"name": "Alice", "age": float64(25)},
+			map[string]interface{}{"name": "Bob", "age": float64(30)},
+			map[string]interface{}{"name": "Charlie", "age": float64(35)},
+		},
+	}
+
+	result, err := executeJQ(".users[] | select(.age > 28) | .name", jsonData)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var resultArray []interface{}
+	if err := json.Unmarshal([]byte(result), &resultArray); err != nil {
+		t.Fatalf("failed to parse result as array: %v", err)
+	}
+
+	if len(resultArray) != 2 {
+		t.Errorf("expected 2 results, got %d", len(resultArray))
+	}
+}
+
+func TestExecuteJQ_KeysQuery(t *testing.T) {
+	jsonData := map[string]interface{}{
+		"name": "John",
+		"age":  float64(30),
+		"city": "NYC",
+	}
+
+	result, err := executeJQ("keys", jsonData)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var keys []string
+	if err := json.Unmarshal([]byte(result), &keys); err != nil {
+		t.Fatalf("failed to parse result: %v", err)
+	}
+
+	if len(keys) != 3 {
+		t.Errorf("expected 3 keys, got %d", len(keys))
+	}
+}
+
+func TestExecuteJQ_InvalidFilter(t *testing.T) {
+	jsonData := map[string]interface{}{
+		"name": "John Doe",
+	}
+
+	_, err := executeJQ(".[invalid", jsonData)
+	if err == nil {
+		t.Fatal("expected error for invalid filter, got nil")
+	}
+
+	if err.Error() == "" {
+		t.Error("expected non-empty error message")
+	}
+}
+
+func TestExecuteJQ_NonExistentKey(t *testing.T) {
+	jsonData := map[string]interface{}{
+		"name": "John Doe",
+	}
+
+	result, err := executeJQ(".nonexistent", jsonData)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	expected := "null"
+	if result != expected {
+		t.Errorf("expected %s for non-existent key, got %s", expected, result)
+	}
+}
+
+func TestExecuteJQ_EmptyArray(t *testing.T) {
+	jsonData := map[string]interface{}{
+		"items": []interface{}{},
+	}
+
+	result, err := executeJQ(".items", jsonData)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	expected := "[]"
+	if result != expected {
+		t.Errorf("expected %s, got %s", expected, result)
+	}
+}
+
+func TestExecuteJQ_IdentityFilter(t *testing.T) {
+	jsonData := map[string]interface{}{
+		"name": "John Doe",
+		"age":  float64(30),
+	}
+
+	result, err := executeJQ(".", jsonData)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var parsed map[string]interface{}
+	if err := json.Unmarshal([]byte(result), &parsed); err != nil {
+		t.Fatalf("failed to parse result: %v", err)
+	}
+
+	if parsed["name"] != "John Doe" {
+		t.Errorf("expected name to be 'John Doe', got %v", parsed["name"])
+	}
+	if parsed["age"] != float64(30) {
+		t.Errorf("expected age to be 30, got %v", parsed["age"])
+	}
+}
+
+func TestExecuteJQ_ComplexNestedData(t *testing.T) {
+	jsonStr := `{
+		"users": [
+			{
+				"id": 1,
+				"name": "Alice",
+				"address": {
+					"street": "123 Main St",
+					"city": "Springfield",
+					"zip": "12345"
+				}
+			},
+			{
+				"id": 2,
+				"name": "Bob",
+				"address": {
+					"street": "456 Oak Ave",
+					"city": "Riverside",
+					"zip": "67890"
+				}
+			}
+		],
+		"total": 2
+	}`
+
+	var jsonData interface{}
+	if err := json.Unmarshal([]byte(jsonStr), &jsonData); err != nil {
+		t.Fatalf("failed to parse test JSON: %v", err)
+	}
+
+	result, err := executeJQ(".users[].address.city", jsonData)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var cities []string
+	if err := json.Unmarshal([]byte(result), &cities); err != nil {
+		t.Fatalf("failed to parse result: %v", err)
+	}
+
+	if len(cities) != 2 {
+		t.Errorf("expected 2 cities, got %d", len(cities))
+	}
+	if cities[0] != "Springfield" {
+		t.Errorf("expected first city to be 'Springfield', got %s", cities[0])
+	}
+	if cities[1] != "Riverside" {
+		t.Errorf("expected second city to be 'Riverside', got %s", cities[1])
+	}
+}
+
+func TestExecuteJQ_LengthQuery(t *testing.T) {
+	jsonData := map[string]interface{}{
+		"items": []interface{}{1, 2, 3, 4, 5},
+	}
+
+	result, err := executeJQ(".items | length", jsonData)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	expected := "5"
+	if result != expected {
+		t.Errorf("expected %s, got %s", expected, result)
+	}
+}
+
+func TestExecuteJQ_TypeQuery(t *testing.T) {
+	jsonData := map[string]interface{}{
+		"name": "John",
+		"age":  float64(30),
+	}
+
+	result, err := executeJQ(".age | type", jsonData)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	expected := `"number"`
+	if result != expected {
+		t.Errorf("expected %s, got %s", expected, result)
+	}
+}
