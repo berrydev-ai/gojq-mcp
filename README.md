@@ -359,6 +359,12 @@ Contributions are welcome! Please:
 - Update documentation for API changes
 - Keep commits focused and atomic
 
+## Release Process
+
+1. Update version in `README.md` and `go.mod`
+2. Tag the release (`git tag -a vX.Y.Z -m "Release vX.Y.Z"`)
+3. Push tags (`git push origin --tags`)
+
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
@@ -368,4 +374,3 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [jq Manual](https://jqlang.github.io/jq/manual/) - Complete jq syntax reference
 - [MCP Documentation](https://modelcontextprotocol.io/) - Model Context Protocol specification
 - [gojq Documentation](https://github.com/itchyny/gojq#readme) - gojq library details
-
