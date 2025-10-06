@@ -90,15 +90,65 @@ The typical release workflow:
 git add .
 git commit -m "Add new feature"
 
-# 2. Run the release script
+# 2. Update CHANGELOG.md
+#    - Add changes to the [Unreleased] section as you work
+#    - Before release, create a new version section
+#    - Move items from [Unreleased] to the new version section
+#    Example:
+#      ## [1.1.0] - 2024-10-06
+#      ### Added
+#      - New feature XYZ
+
+# 3. Run the release script
 ./scripts/release.sh v1.1.0
 
-# 3. GitHub Actions automatically:
+# 4. GitHub Actions automatically:
 #    - Runs tests
 #    - Builds binaries for all platforms
-#    - Creates GitHub Release
+#    - Creates GitHub Release with changelog content
 #    - Attaches binaries to release
 ```
+
+## Changelog Maintenance
+
+This project uses [Keep a Changelog](https://keepachangelog.com/) format. Update `CHANGELOG.md` as you make changes:
+
+**While developing:**
+```markdown
+## [Unreleased]
+
+### Added
+- New feature description
+
+### Fixed
+- Bug fix description
+```
+
+**Before releasing version 1.1.0:**
+```markdown
+## [Unreleased]
+
+## [1.1.0] - 2024-10-06
+
+### Added
+- New feature description
+
+### Fixed
+- Bug fix description
+
+[Unreleased]: https://github.com/berrydev-ai/gojq-mcp/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/berrydev-ai/gojq-mcp/compare/v1.0.0...v1.1.0
+```
+
+**Changelog categories:**
+- `Added` - New features
+- `Changed` - Changes to existing functionality
+- `Deprecated` - Soon-to-be removed features
+- `Removed` - Removed features
+- `Fixed` - Bug fixes
+- `Security` - Security fixes
+
+The release script will check for a changelog entry and warn if missing. The release workflow automatically extracts the changelog content for the version being released and includes it in the GitHub release notes.
 
 ## Troubleshooting
 

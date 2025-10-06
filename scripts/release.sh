@@ -32,6 +32,29 @@ validate_version "$VERSION"
 
 info "Creating release $VERSION"
 
+# Check if CHANGELOG.md exists and has been updated for this version
+VERSION_NUM=${VERSION#v}  # Remove 'v' prefix
+if [ -f "CHANGELOG.md" ]; then
+    if ! grep -q "## \[${VERSION_NUM}\]" CHANGELOG.md; then
+        warning "CHANGELOG.md does not contain an entry for version ${VERSION_NUM}"
+        echo
+        info "Please update CHANGELOG.md before creating a release:"
+        echo "  1. Add a new section: ## [${VERSION_NUM}] - $(date +%Y-%m-%d)"
+        echo "  2. Move items from [Unreleased] to the new section"
+        echo "  3. Update the comparison links at the bottom"
+        echo
+        read -p "Continue without changelog entry? (y/N) " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            error "Aborted. Please update CHANGELOG.md first."
+        fi
+    else
+        success "Found CHANGELOG.md entry for version ${VERSION_NUM}"
+    fi
+else
+    warning "CHANGELOG.md not found - consider creating one for better release documentation"
+fi
+
 # Check if we're in a git repository
 if ! git rev-parse --git-dir > /dev/null 2>&1; then
     error "Not in a git repository"

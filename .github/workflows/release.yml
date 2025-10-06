@@ -86,11 +86,43 @@ jobs:
           VERSION=${GITHUB_REF#refs/tags/}
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
 
-          # Create release notes
-          cat << EOF > release_notes.md
-          ## Release ${VERSION}
+          # Extract changelog for this version
+          if [ -f CHANGELOG.md ]; then
+            # Remove 'v' prefix for changelog lookup
+            VERSION_NUM=${VERSION#v}
 
-          ### Downloads
+            # Extract the section for this version from CHANGELOG.md
+            CHANGELOG_CONTENT=$(awk -v ver="$VERSION_NUM" '
+              BEGIN { found=0; content="" }
+              /^## \[/ {
+                if (found) exit
+                if ($0 ~ "\\[" ver "\\]") {
+                  found=1
+                  next
+                }
+              }
+              found { content = content $0 "\n" }
+              END { print content }
+            ' CHANGELOG.md)
+
+            if [ -n "$CHANGELOG_CONTENT" ]; then
+              echo "Found changelog content for version $VERSION_NUM"
+            else
+              echo "No changelog content found for version $VERSION_NUM, using default"
+              CHANGELOG_CONTENT="See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) for details."
+            fi
+          else
+            echo "CHANGELOG.md not found"
+            CHANGELOG_CONTENT="Release $VERSION"
+          fi
+
+          # Create release notes with changelog content
+          cat << EOF > release_notes.md
+          ## What's Changed
+
+          ${CHANGELOG_CONTENT}
+
+          ## Downloads
 
           Download the appropriate binary for your platform:
 
@@ -100,13 +132,13 @@ jobs:
           - **macOS (Apple Silicon)**: \`gojq-mcp-darwin-arm64\`
           - **Windows (amd64)**: \`gojq-mcp-windows-amd64.exe\`
 
-          ### Installation
+          ## Installation
 
           1. Download the binary for your platform
           2. Make it executable: \`chmod +x gojq-mcp-*\` (Unix-like systems)
           3. Move to your PATH or use directly
 
-          ### Usage
+          ## Usage
 
           See the [README](https://github.com/${{ github.repository }}/blob/main/README.md) for usage instructions.
           EOF
