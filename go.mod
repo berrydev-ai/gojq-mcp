@@ -1,4 +1,4 @@
-module berrydev-ai/gojq-mcp
+module github.com/berrydev-ai/gojq-mcp
 
 go 1.24.4
 
