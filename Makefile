@@ -19,5 +19,8 @@ install:
 run-cli:
 	go run . -f examples/sample.json -q '.'
 
+run-build: build
+	./dist/gojq-mcp -f ./examples/sample.json -q '.'
+
 run-server:
 	go run .

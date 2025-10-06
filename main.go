@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"os"
 
@@ -53,7 +54,46 @@ func executeJQ(jqFilter string, jsonData interface{}) (string, error) {
 	return string(output), nil
 }
 
+// runCLIMode executes jq query on a file and prints the result
+func runCLIMode(filePath, query string) {
+	// Read the JSON file
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error reading file: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Parse JSON
+	var jsonData interface{}
+	if err := json.Unmarshal(data, &jsonData); err != nil {
+		fmt.Fprintf(os.Stderr, "Error parsing JSON: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Execute jq query
+	result, err := executeJQ(query, jsonData)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error executing jq query: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Print result
+	fmt.Println(result)
+}
+
 func main() {
+	// Parse CLI flags
+	filePath := flag.String("f", "", "Path to JSON file")
+	query := flag.String("q", "", "jq query to execute")
+	flag.Parse()
+
+	// If CLI flags are provided, run in CLI mode
+	if *filePath != "" && *query != "" {
+		runCLIMode(*filePath, *query)
+		return
+	}
+
+	// Otherwise, run in MCP server mode
 	// Create a new MCP server
 	s := server.NewMCPServer(
 		"GoJQ MCP Server",
