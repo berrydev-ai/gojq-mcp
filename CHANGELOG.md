@@ -7,31 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
-- Initial release preparation
-- MCP server mode with `run_jq` tool
-- Support for jq filter execution on JSON files
-- Cross-platform binary builds (Linux, macOS, Windows)
-- Automated release process with GitHub Actions
-
-### Changed
-
-### Deprecated
-
-### Removed
-
-### Fixed
-
-### Security
-
-## [0.1.0] - 2024-XX-XX (Example - update with actual dates)
+## [1.0.0] - 2025-10-06
 
 ### Added
-- MCP server implementation using gojq library
-- JSON file validation and jq filter execution
-- Command-line interface support
+- MCP server implementation with `run_jq` tool for jq filter execution on JSON files
+- JSON file validation and error handling
+- Cross-platform binary builds (Linux, macOS, Windows for amd64/arm64)
+- Automated release workflow with GitHub Actions
 - Comprehensive test suite
-- Multi-platform build support (amd64, arm64)
+- Release scripts with changelog integration
 
-[Unreleased]: https://github.com/berrydev-ai/gojq-mcp/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/berrydev-ai/gojq-mcp/releases/tag/v0.1.0
+[Unreleased]: https://github.com/berrydev-ai/gojq-mcp/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/berrydev-ai/gojq-mcp/releases/tag/v1.0.0
