@@ -12,6 +12,47 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 )
 
+const version = "1.0.1"
+
+func printUsage() {
+	fmt.Fprintf(os.Stderr, `gojq-mcp v%s - A dual-mode JSON query tool
+
+USAGE:
+  gojq-mcp [OPTIONS]
+
+MODES:
+  CLI Mode:    gojq-mcp -f <file> -q <query>
+  Server Mode: gojq-mcp [-t <transport>] [-a <address>]
+
+OPTIONS:
+  -f <file>       Path to JSON file (CLI mode)
+  -q <query>      jq query to execute (CLI mode)
+  -t <transport>  Transport type: stdio, http, or sse (default: stdio)
+  -a <address>    Address to listen on for http/sse (default: :8080)
+  --version       Display version information
+  --help          Display this help message
+
+EXAMPLES:
+  # CLI mode - query a JSON file
+  gojq-mcp -f data.json -q '.users[] | select(.age > 30)'
+
+  # Server mode - stdio transport (default)
+  gojq-mcp
+
+  # Server mode - HTTP transport
+  gojq-mcp -t http
+  gojq-mcp -t http -a :9000
+
+  # Server mode - SSE transport
+  gojq-mcp -t sse
+  gojq-mcp -t sse -a localhost:8080
+
+DOCUMENTATION:
+  https://github.com/berrydev-ai/gojq-mcp
+
+`, version)
+}
+
 // executeJQ runs a jq query on JSON data and returns the results as a JSON string
 func executeJQ(jqFilter string, jsonData interface{}) (string, error) {
 	// Parse the jq filter
@@ -82,10 +123,22 @@ func runCLIMode(filePath, query string) {
 }
 
 func main() {
+	// Custom usage function
+	flag.Usage = printUsage
+
 	// Parse CLI flags
 	filePath := flag.String("f", "", "Path to JSON file")
 	query := flag.String("q", "", "jq query to execute")
+	transport := flag.String("t", "stdio", "Transport type: stdio, http, or sse")
+	address := flag.String("a", ":8080", "Address to listen on (for http/sse transports)")
+	showVersion := flag.Bool("version", false, "Display version information")
 	flag.Parse()
+
+	// Handle version flag
+	if *showVersion {
+		fmt.Printf("gojq-mcp version %s\n", version)
+		return
+	}
 
 	// If CLI flags are provided, run in CLI mode
 	if *filePath != "" && *query != "" {
@@ -163,8 +216,27 @@ func main() {
 		return mcp.NewToolResultText(results), nil
 	})
 
-	// Start the server
-	if err := server.ServeStdio(s); err != nil {
-		fmt.Printf("Server error: %v\n", err)
+	// Start the server with the specified transport
+	var err error
+	switch *transport {
+	case "stdio":
+		fmt.Fprintln(os.Stderr, "Starting MCP server with stdio transport...")
+		err = server.ServeStdio(s)
+	case "http":
+		fmt.Fprintf(os.Stderr, "Starting MCP server with HTTP transport on %s...\n", *address)
+		httpServer := server.NewStreamableHTTPServer(s)
+		err = httpServer.Start(*address)
+	case "sse":
+		fmt.Fprintf(os.Stderr, "Starting MCP server with SSE transport on %s...\n", *address)
+		sseServer := server.NewSSEServer(s)
+		err = sseServer.Start(*address)
+	default:
+		fmt.Fprintf(os.Stderr, "Error: invalid transport type '%s'. Must be 'stdio', 'http', or 'sse'\n", *transport)
+		os.Exit(1)
+	}
+
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Server error: %v\n", err)
+		os.Exit(1)
 	}
 }

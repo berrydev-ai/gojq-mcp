@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.2] - 2025-10-06
+
+### Added
+- HTTP transport support via `-t http` flag for web-based MCP integrations
+- SSE (Server-Sent Events) transport support via `-t sse` flag for event-driven clients
+- Transport selection flag `-t` with support for stdio (default), http, and sse transports
+- Address flag `-a` for configuring listening address for http/sse transports (default: :8080)
+- `--help` and `-h` flags to display comprehensive usage information
+- `--version` flag to display version information
+- Makefile targets for running different transports: `run-http`, `run-http-custom`, `run-sse`, `run-sse-custom`
+
+### Changed
+- Enhanced CLI with better help output showing all available modes, options, and examples
+- Server startup now displays informative messages indicating transport type and listening address
+
 ## [1.0.1] - 2025-10-06
 
 ### Fixed

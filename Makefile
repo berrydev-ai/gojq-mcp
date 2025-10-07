@@ -1,4 +1,4 @@
-.PHONY: build clean test install
+.PHONY: build clean test install run-cli run-build run-inspector run-server run-http run-http-custom run-sse run-sse-custom
 
 BINARY_NAME=gojq-mcp
 BUILD_DIR=dist
@@ -27,3 +27,15 @@ run-inspector: build
 
 run-server:
 	go run .
+
+run-http:
+	go run . -t http
+
+run-http-custom:
+	go run . -t http -a :9000
+
+run-sse:
+	go run . -t sse
+
+run-sse-custom:
+	go run . -t sse -a :9000
