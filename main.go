@@ -45,7 +45,7 @@ EXAMPLES:
 
   # Server mode - SSE transport
   gojq-mcp -t sse
-  gojq-mcp -t sse -a localhost:8080
+  gojq-mcp -t sse -a :8080
 
 DOCUMENTATION:
   https://github.com/berrydev-ai/gojq-mcp
