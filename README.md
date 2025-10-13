@@ -85,6 +85,17 @@ The default mode runs as an MCP server using stdio transport, perfect for integr
 }
 ```
 
+### HTTP and SSE Transports
+
+When running the server over HTTP or SSE, provide a default JSON document so requests can omit `json_file_path`:
+
+```bash
+gojq-mcp -t http --default-json-file /absolute/path/to/sample.json
+gojq-mcp -t sse --default-json-file /absolute/path/to/sample.json
+```
+
+Individual requests can still override the path; stdio transport continues to require `json_file_path` explicitly.
+
 ### CLI Mode (Coming Soon)
 
 Direct command-line execution is planned for future releases:
@@ -223,6 +234,10 @@ make run-server
 
 # CLI mode (when implemented)
 make run-cli
+
+# HTTP/SSE transport server with default data
+go run . -t http --default-json-file $(pwd)/examples/sample.json
+go run . -t sse --default-json-file $(pwd)/examples/sample.json
 ```
 
 ### Cleaning
@@ -250,7 +265,7 @@ The project uses GitHub Actions to automatically build and publish releases for 
    ```bash
    # Create a tag following semantic versioning
    git tag v1.0.0
-   
+
    # Push the tag to trigger the build workflow
    git push origin v1.0.0
    ```

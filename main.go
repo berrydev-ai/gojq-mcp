@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/itchyny/gojq"
 	"github.com/mark3labs/mcp-go/mcp"
@@ -29,6 +30,8 @@ OPTIONS:
   -q <query>      jq query to execute (CLI mode)
   -t <transport>  Transport type: stdio, http, or sse (default: stdio)
   -a <address>    Address to listen on for http/sse (default: :8080)
+  --default-json-file <file>
+                  Default JSON file path for http/sse transports
   --version       Display version information
   --help          Display this help message
 
@@ -131,6 +134,7 @@ func main() {
 	query := flag.String("q", "", "jq query to execute")
 	transport := flag.String("t", "stdio", "Transport type: stdio, http, or sse")
 	address := flag.String("a", ":8080", "Address to listen on (for http/sse transports)")
+	defaultJSON := flag.String("default-json-file", "", "Default JSON file path for http/sse transports")
 	showVersion := flag.Bool("version", false, "Display version information")
 	flag.Parse()
 
@@ -138,6 +142,16 @@ func main() {
 	if *showVersion {
 		fmt.Printf("gojq-mcp version %s\n", version)
 		return
+	}
+
+	resolvedDefaultJSONPath := ""
+	if *defaultJSON != "" {
+		absPath, err := filepath.Abs(*defaultJSON)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error resolving default JSON file path: %v\n", err)
+			os.Exit(1)
+		}
+		resolvedDefaultJSONPath = absPath
 	}
 
 	// If CLI flags are provided, run in CLI mode
@@ -156,16 +170,22 @@ func main() {
 	)
 
 	// Add a jq query tool
+	jsonFileDescription := "Absolute path to the JSON file to process"
+	if resolvedDefaultJSONPath != "" && *transport != "stdio" {
+		jsonFileDescription = "Absolute path to the JSON file to process (optional when a default is configured)"
+	}
+	jsonFileArgOptions := []mcp.PropertyOption{mcp.Description(jsonFileDescription)}
+	if *transport == "stdio" || resolvedDefaultJSONPath == "" {
+		jsonFileArgOptions = append(jsonFileArgOptions, mcp.Required())
+	}
+
 	runJqTool := mcp.NewTool("run_jq",
 		mcp.WithDescription("Queries the JSON data using a jq query."),
 		mcp.WithString("jq_filter",
 			mcp.Required(),
 			mcp.Description("The jq filter to execute"),
 		),
-		mcp.WithString("json_file_path",
-			mcp.Required(),
-			mcp.Description("Absolute path to the JSON file to process"),
-		),
+		mcp.WithString("json_file_path", jsonFileArgOptions...),
 	)
 
 	// Add the run_jq handler
@@ -176,9 +196,23 @@ func main() {
 			return mcp.NewToolResultError(err.Error()), nil
 		}
 
-		jsonFilePath, err := request.RequireString("json_file_path")
-		if err != nil {
-			return mcp.NewToolResultError(err.Error()), nil
+		jsonFilePath := ""
+		if args := request.GetArguments(); args != nil {
+			if rawPath, ok := args["json_file_path"]; ok {
+				pathStr, ok := rawPath.(string)
+				if !ok {
+					return mcp.NewToolResultError("argument \"json_file_path\" is not a string"), nil
+				}
+				jsonFilePath = pathStr
+			}
+		}
+
+		if jsonFilePath == "" {
+			if *transport != "stdio" && resolvedDefaultJSONPath != "" {
+				jsonFilePath = resolvedDefaultJSONPath
+			} else {
+				return mcp.NewToolResultError("required argument \"json_file_path\" not found"), nil
+			}
 		}
 
 		// 1. Check if file exists

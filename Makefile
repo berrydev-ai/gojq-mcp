@@ -25,6 +25,9 @@ run-build: build
 run-inspector: build
 	npx @modelcontextprotocol/inspector go run .
 
+run-inspector-default-path:
+	npx @modelcontextprotocol/inspector go run . -t http --default-json-file ./examples/sample.json -a :9001
+
 run-server:
 	go run .
 
