@@ -13,7 +13,7 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 )
 
-const version = "1.0.2"
+const version = "1.0.3"
 
 func printUsage() {
 	fmt.Fprintf(os.Stderr, `gojq-mcp v%s - A dual-mode JSON query tool
