@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.4] - 2025-10-14
+
+### Added
+- `-token` flag to require bearer authentication for HTTP and SSE server transports
+- HTTP transport enforcement of `Authorization: Bearer` requests when a token is configured
+- SSE transport token validation via query parameter (with header fallback) plus automatic propagation to message endpoints
+- Regression tests covering token parsing and validation helpers
+
 ## [1.0.3] - 2025-10-13
 
 ### Added
@@ -46,7 +54,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Comprehensive test suite
 - Release scripts with changelog integration
 
-[Unreleased]: https://github.com/berrydev-ai/gojq-mcp/compare/v1.0.3...HEAD
+[Unreleased]: https://github.com/berrydev-ai/gojq-mcp/compare/v1.0.4...HEAD
+[1.0.4]: https://github.com/berrydev-ai/gojq-mcp/compare/v1.0.3...v1.0.4
 [1.0.3]: https://github.com/berrydev-ai/gojq-mcp/compare/v1.0.2...v1.0.3
 [1.0.2]: https://github.com/berrydev-ai/gojq-mcp/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/berrydev-ai/gojq-mcp/compare/v1.0.0...v1.0.1
