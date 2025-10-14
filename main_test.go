@@ -2,6 +2,8 @@ package main
 
 import (
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 )
 
@@ -199,6 +201,154 @@ func TestExecuteJQ_EmptyArray(t *testing.T) {
 	expected := "[]"
 	if result != expected {
 		t.Errorf("expected %s, got %s", expected, result)
+	}
+}
+
+func TestExtractBearerToken(t *testing.T) {
+	testCases := []struct {
+		name      string
+		header    string
+		expected  string
+		expectsOK bool
+	}{
+		{
+			name:      "valid header",
+			header:    "Bearer secret",
+			expected:  "secret",
+			expectsOK: true,
+		},
+		{
+			name:      "lowercase prefix",
+			header:    "bearer secret",
+			expected:  "secret",
+			expectsOK: true,
+		},
+		{
+			name:      "missing scheme",
+			header:    "secret",
+			expected:  "",
+			expectsOK: false,
+		},
+		{
+			name:      "wrong scheme",
+			header:    "Basic secret",
+			expected:  "",
+			expectsOK: false,
+		},
+		{
+			name:      "empty token",
+			header:    "Bearer ",
+			expected:  "",
+			expectsOK: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			token, ok := extractBearerToken(tc.header)
+			if ok != tc.expectsOK {
+				t.Fatalf("expected ok=%v, got %v", tc.expectsOK, ok)
+			}
+			if token != tc.expected {
+				t.Fatalf("expected token %q, got %q", tc.expected, token)
+			}
+		})
+	}
+}
+
+func TestAuthorizeHTTPBearer(t *testing.T) {
+	const expectedToken = "secret-token"
+
+	testCases := []struct {
+		name   string
+		header string
+		wantOK bool
+	}{
+		{
+			name:   "matching token",
+			header: "Bearer secret-token",
+			wantOK: true,
+		},
+		{
+			name:   "case insensitive scheme",
+			header: "bearer secret-token",
+			wantOK: true,
+		},
+		{
+			name:   "wrong token",
+			header: "Bearer other",
+			wantOK: false,
+		},
+		{
+			name:   "missing header",
+			header: "",
+			wantOK: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPost, "http://example.com/mcp", nil)
+			if tc.header != "" {
+				req.Header.Set("Authorization", tc.header)
+			}
+			if got := authorizeHTTPBearer(expectedToken, req); got != tc.wantOK {
+				t.Fatalf("expected %v, got %v", tc.wantOK, got)
+			}
+		})
+	}
+}
+
+func TestAuthorizeSSEToken(t *testing.T) {
+	const expectedToken = "secret-token"
+
+	testCases := []struct {
+		name       string
+		method     string
+		queryToken string
+		header     string
+		wantOK     bool
+	}{
+		{
+			name:       "matching query token",
+			method:     http.MethodGet,
+			queryToken: expectedToken,
+			wantOK:     true,
+		},
+		{
+			name:       "wrong query token",
+			method:     http.MethodGet,
+			queryToken: "wrong",
+			wantOK:     false,
+		},
+		{
+			name:   "header fallback",
+			method: http.MethodPost,
+			header: "Bearer secret-token",
+			wantOK: true,
+		},
+		{
+			name:   "missing token",
+			method: http.MethodPost,
+			wantOK: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(tc.method, "http://example.com/mcp", nil)
+			if tc.queryToken != "" {
+				values := req.URL.Query()
+				values.Set("token", tc.queryToken)
+				req.URL.RawQuery = values.Encode()
+			}
+			if tc.header != "" {
+				req.Header.Set("Authorization", tc.header)
+			}
+			if got := authorizeSSEToken(expectedToken, req); got != tc.wantOK {
+				t.Fatalf("expected %v, got %v", tc.wantOK, got)
+			}
+		})
 	}
 }
 

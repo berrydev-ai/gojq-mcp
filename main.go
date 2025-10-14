@@ -2,11 +2,14 @@ package main
 
 import (
 	"context"
+	"crypto/subtle"
 	"encoding/json"
 	"flag"
 	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/itchyny/gojq"
 	"github.com/mark3labs/mcp-go/mcp"
@@ -30,6 +33,7 @@ OPTIONS:
   -q <query>      jq query to execute (CLI mode)
   -t <transport>  Transport type: stdio, http, or sse (default: stdio)
   -a <address>    Address to listen on for http/sse (default: :8080)
+  -token <token>  Bearer token required by http/sse transports
   --default-json-file <file>
                   Default JSON file path for http/sse transports
   --version       Display version information
@@ -125,6 +129,60 @@ func runCLIMode(filePath, query string) {
 	fmt.Println(result)
 }
 
+func extractBearerToken(header string) (string, bool) {
+	const bearerPrefix = "Bearer "
+	if header == "" {
+		return "", false
+	}
+	if len(header) < len(bearerPrefix) || !strings.EqualFold(header[:len(bearerPrefix)], bearerPrefix) {
+		return "", false
+	}
+	token := strings.TrimSpace(header[len(bearerPrefix):])
+	if token == "" {
+		return "", false
+	}
+	return token, true
+}
+
+func tokensMatch(expected, candidate string) bool {
+	if expected == "" {
+		return true
+	}
+	if candidate == "" || len(candidate) != len(expected) {
+		return false
+	}
+	return subtle.ConstantTimeCompare([]byte(expected), []byte(candidate)) == 1
+}
+
+func authorizeHTTPBearer(expected string, r *http.Request) bool {
+	if expected == "" {
+		return true
+	}
+	candidate, ok := extractBearerToken(r.Header.Get("Authorization"))
+	if !ok {
+		return false
+	}
+	return tokensMatch(expected, candidate)
+}
+
+func authorizeSSEToken(expected string, r *http.Request) bool {
+	if expected == "" {
+		return true
+	}
+	if tokensMatch(expected, r.URL.Query().Get("token")) {
+		return true
+	}
+	if candidate, ok := extractBearerToken(r.Header.Get("Authorization")); ok {
+		return tokensMatch(expected, candidate)
+	}
+	return false
+}
+
+func writeUnauthorized(w http.ResponseWriter) {
+	w.Header().Set("WWW-Authenticate", "Bearer realm=\"gojq-mcp\"")
+	http.Error(w, "Unauthorized", http.StatusUnauthorized)
+}
+
 func main() {
 	// Custom usage function
 	flag.Usage = printUsage
@@ -135,6 +193,7 @@ func main() {
 	transport := flag.String("t", "stdio", "Transport type: stdio, http, or sse")
 	address := flag.String("a", ":8080", "Address to listen on (for http/sse transports)")
 	defaultJSON := flag.String("default-json-file", "", "Default JSON file path for http/sse transports")
+	tokenFlag := flag.String("token", "", "Bearer token required by http/sse transports")
 	showVersion := flag.Bool("version", false, "Display version information")
 	flag.Parse()
 
@@ -143,6 +202,8 @@ func main() {
 		fmt.Printf("gojq-mcp version %s\n", version)
 		return
 	}
+
+	authToken := strings.TrimSpace(*tokenFlag)
 
 	resolvedDefaultJSONPath := ""
 	if *defaultJSON != "" {
@@ -258,12 +319,41 @@ func main() {
 		err = server.ServeStdio(s)
 	case "http":
 		fmt.Fprintf(os.Stderr, "Starting MCP server with HTTP transport on %s...\n", *address)
-		httpServer := server.NewStreamableHTTPServer(s)
-		err = httpServer.Start(*address)
+		if authToken != "" {
+			var httpServer *server.StreamableHTTPServer
+			handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if !authorizeHTTPBearer(authToken, r) {
+					writeUnauthorized(w)
+					return
+				}
+				httpServer.ServeHTTP(w, r)
+			})
+			srv := &http.Server{Addr: *address, Handler: handler}
+			httpServer = server.NewStreamableHTTPServer(s, server.WithStreamableHTTPServer(srv))
+			err = httpServer.Start(*address)
+		} else {
+			httpServer := server.NewStreamableHTTPServer(s)
+			err = httpServer.Start(*address)
+		}
 	case "sse":
 		fmt.Fprintf(os.Stderr, "Starting MCP server with SSE transport on %s...\n", *address)
-		sseServer := server.NewSSEServer(s)
-		err = sseServer.Start(*address)
+		if authToken != "" {
+			var sseServerInstance *server.SSEServer
+			handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if !authorizeSSEToken(authToken, r) {
+					writeUnauthorized(w)
+					return
+				}
+				sseServerInstance.ServeHTTP(w, r)
+			})
+			srv := &http.Server{Addr: *address, Handler: handler}
+			opts := []server.SSEOption{server.WithHTTPServer(srv), server.WithAppendQueryToMessageEndpoint()}
+			sseServerInstance = server.NewSSEServer(s, opts...)
+			err = sseServerInstance.Start(*address)
+		} else {
+			sseServer := server.NewSSEServer(s)
+			err = sseServer.Start(*address)
+		}
 	default:
 		fmt.Fprintf(os.Stderr, "Error: invalid transport type '%s'. Must be 'stdio', 'http', or 'sse'\n", *transport)
 		os.Exit(1)
