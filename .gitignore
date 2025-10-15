@@ -25,3 +25,14 @@ go.work
 *.swo
 *~
 .DS_Store
+
+
+.kilocode/rules/memory-bank/context.md
+!.kilocode/rules/memory-bank/architecture.md
+!.kilocode/rules/memory-bank/brief.md
+!.kilocode/rules/memory-bank/product.md
+!.kilocode/rules/memory-bank/memory-bank-instructions.md
+!.kilocode/rules/memory-bank/tech.md
+
+qdrant_storage/*
+raft_state.json
