@@ -1,0 +1,12 @@
+{
+  "transactions": [
+    {
+      "id": "txn_006",
+      "created_at": "2025-01-03T11:00:00.000-06:00",
+      "amount": 125.00,
+      "payout": 118.75,
+      "description": "API consulting",
+      "category": "services"
+    }
+  ]
+}

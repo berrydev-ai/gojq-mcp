@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/itchyny/gojq"
@@ -60,6 +61,69 @@ DOCUMENTATION:
 `, version)
 }
 
+// expandGlobPatterns expands glob patterns to actual file paths
+func expandGlobPatterns(patterns []string) ([]string, error) {
+	var expandedPaths []string
+
+	for _, pattern := range patterns {
+		matches, err := filepath.Glob(pattern)
+		if err != nil {
+			return nil, fmt.Errorf("error expanding glob pattern %q: %w", pattern, err)
+		}
+		expandedPaths = append(expandedPaths, matches...)
+	}
+
+	// Remove duplicates and sort for consistent ordering
+	seen := make(map[string]bool)
+	var uniquePaths []string
+	for _, path := range expandedPaths {
+		if !seen[path] {
+			seen[path] = true
+			uniquePaths = append(uniquePaths, path)
+		}
+	}
+	sort.Strings(uniquePaths)
+
+	return uniquePaths, nil
+}
+
+// validateAndReadJSONFiles validates and reads multiple JSON files
+func validateAndReadJSONFiles(filePaths []string) ([]interface{}, error) {
+	var jsonData []interface{}
+
+	for _, filePath := range filePaths {
+		// Check if file exists
+		fileInfo, err := os.Stat(filePath)
+		if err != nil {
+			if os.IsNotExist(err) {
+				return nil, fmt.Errorf("file does not exist: %s", filePath)
+			}
+			return nil, fmt.Errorf("error accessing file %s: %w", filePath, err)
+		}
+
+		// Ensure it's a file, not a directory
+		if fileInfo.IsDir() {
+			return nil, fmt.Errorf("path is a directory, not a file: %s", filePath)
+		}
+
+		// Read file contents
+		data, err := os.ReadFile(filePath)
+		if err != nil {
+			return nil, fmt.Errorf("file %s is not readable: %w", filePath, err)
+		}
+
+		// Parse JSON
+		var parsedData interface{}
+		if err := json.Unmarshal(data, &parsedData); err != nil {
+			return nil, fmt.Errorf("file %s does not contain valid JSON: %w", filePath, err)
+		}
+
+		jsonData = append(jsonData, parsedData)
+	}
+
+	return jsonData, nil
+}
+
 // executeJQ runs a jq query on JSON data and returns the results as a JSON string
 func executeJQ(jqFilter string, jsonData interface{}) (string, error) {
 	// Parse the jq filter
@@ -70,6 +134,57 @@ func executeJQ(jqFilter string, jsonData interface{}) (string, error) {
 
 	// Execute the query on the JSON data
 	iter := query.Run(jsonData)
+	var results []interface{}
+
+	for {
+		v, ok := iter.Next()
+		if !ok {
+			break
+		}
+		if err, ok := v.(error); ok {
+			// Check for halt errors (normal termination)
+			if haltErr, ok := err.(*gojq.HaltError); ok && haltErr.Value() == nil {
+				break
+			}
+			return "", fmt.Errorf("jq execution error: %w", err)
+		}
+		results = append(results, v)
+	}
+
+	// If only one result, return it directly; otherwise return as array
+	var output []byte
+	if len(results) == 1 {
+		output, err = json.MarshalIndent(results[0], "", "  ")
+	} else {
+		output, err = json.MarshalIndent(results, "", "  ")
+	}
+
+	if err != nil {
+		return "", fmt.Errorf("error formatting results: %w", err)
+	}
+
+	return string(output), nil
+}
+
+// executeJQMultiFiles runs a jq query on multiple JSON files using the 'inputs' function
+func executeJQMultiFiles(jqFilter string, jsonData []interface{}) (string, error) {
+	// Parse the jq filter
+	query, err := gojq.Parse(jqFilter)
+	if err != nil {
+		return "", fmt.Errorf("invalid jq filter: %w", err)
+	}
+
+	// Create an iterator for the input data
+	inputIter := gojq.NewIter(jsonData...)
+
+	// Compile the query with input iterator
+	code, err := gojq.Compile(query, gojq.WithInputIter(inputIter))
+	if err != nil {
+		return "", fmt.Errorf("failed to compile jq query: %w", err)
+	}
+
+	// Execute the query - use nil as the main input since we're using inputs
+	iter := code.Run(nil)
 	var results []interface{}
 
 	for {
@@ -241,13 +356,16 @@ func main() {
 	}
 
 	runJqTool := mcp.NewTool("run_jq",
-		mcp.WithDescription("Queries the JSON data using a jq query."),
+		mcp.WithDescription("Queries the JSON data using a jq query. Supports single files or multiple files with glob patterns."),
 		mcp.WithString("jq_filter",
 			mcp.Required(),
-			mcp.Description("The jq filter to execute"),
+			mcp.Description("The jq filter to execute. Use 'inputs' for multi-file queries"),
 		),
-		mcp.WithString("json_file_path", jsonFileArgOptions...),
+		mcp.WithString("json_file_path",
+			jsonFileArgOptions...,
+		),
 	)
+
 
 	// Add the run_jq handler
 	s.AddTool(runJqTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -257,53 +375,81 @@ func main() {
 			return mcp.NewToolResultError(err.Error()), nil
 		}
 
-		jsonFilePath := ""
+		// Handle json_file_path parameter - can be string or []string
+		var filePaths []string
 		if args := request.GetArguments(); args != nil {
 			if rawPath, ok := args["json_file_path"]; ok {
-				pathStr, ok := rawPath.(string)
-				if !ok {
-					return mcp.NewToolResultError("argument \"json_file_path\" is not a string"), nil
+				switch pathValue := rawPath.(type) {
+				case string:
+					// Single file path
+					filePaths = []string{pathValue}
+				case []interface{}:
+					// Array of file paths
+					for _, item := range pathValue {
+						if str, ok := item.(string); ok {
+							filePaths = append(filePaths, str)
+						} else {
+							return mcp.NewToolResultError("all elements in json_file_path array must be strings"), nil
+						}
+					}
+				default:
+					return mcp.NewToolResultError("json_file_path must be a string or array of strings"), nil
 				}
-				jsonFilePath = pathStr
 			}
 		}
 
-		if jsonFilePath == "" {
+		// For backward compatibility, also check for json_file_paths (plural)
+		if len(filePaths) == 0 {
+			if args := request.GetArguments(); args != nil {
+				if rawPaths, ok := args["json_file_paths"]; ok {
+					if pathsArray, ok := rawPaths.([]interface{}); ok {
+						for _, item := range pathsArray {
+							if str, ok := item.(string); ok {
+								filePaths = append(filePaths, str)
+							} else {
+								return mcp.NewToolResultError("all elements in json_file_paths array must be strings"), nil
+							}
+						}
+					}
+				}
+			}
+		}
+
+		// If no paths provided, use default for non-stdio transports
+		if len(filePaths) == 0 {
 			if *transport != "stdio" && resolvedDefaultJSONPath != "" {
-				jsonFilePath = resolvedDefaultJSONPath
+				filePaths = []string{resolvedDefaultJSONPath}
 			} else {
 				return mcp.NewToolResultError("required argument \"json_file_path\" not found"), nil
 			}
 		}
 
-		// 1. Check if file exists
-		fileInfo, err := os.Stat(jsonFilePath)
+		// Expand glob patterns
+		expandedPaths, err := expandGlobPatterns(filePaths)
 		if err != nil {
-			if os.IsNotExist(err) {
-				return mcp.NewToolResultError(fmt.Sprintf("file does not exist: %s", jsonFilePath)), nil
-			}
-			return mcp.NewToolResultError(fmt.Sprintf("error accessing file: %v", err)), nil
+			return mcp.NewToolResultError(fmt.Sprintf("error expanding glob patterns: %v", err)), nil
 		}
 
-		// Ensure it's a file, not a directory
-		if fileInfo.IsDir() {
-			return mcp.NewToolResultError(fmt.Sprintf("path is a directory, not a file: %s", jsonFilePath)), nil
+		if len(expandedPaths) == 0 {
+			return mcp.NewToolResultError("no files found matching the provided patterns"), nil
 		}
 
-		// 2. Check if file is readable and read contents
-		data, err := os.ReadFile(jsonFilePath)
+		// Validate and read all JSON files
+		jsonDataList, err := validateAndReadJSONFiles(expandedPaths)
 		if err != nil {
-			return mcp.NewToolResultError(fmt.Sprintf("file is not readable: %v", err)), nil
+			return mcp.NewToolResultError(err.Error()), nil
 		}
 
-		// 3. Check if contents are valid JSON
-		var jsonData interface{}
-		if err := json.Unmarshal(data, &jsonData); err != nil {
-			return mcp.NewToolResultError(fmt.Sprintf("file does not contain valid JSON: %v", err)), nil
+		// Execute jq query - use multi-file execution if multiple files
+		var results string
+		if len(jsonDataList) == 1 {
+			// Single file - use original executeJQ
+			results, err = executeJQ(jqFilter, jsonDataList[0])
+		} else {
+			// Multiple files - use executeJQMultiFiles with inputs
+			results, err = executeJQMultiFiles(jqFilter, jsonDataList)
 		}
 
-		// 4. Execute jq filter on the parsed JSON data
-		results, err := executeJQ(jqFilter, jsonData)
 		if err != nil {
 			return mcp.NewToolResultError(err.Error()), nil
 		}

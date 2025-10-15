@@ -459,3 +459,148 @@ func TestExecuteJQ_TypeQuery(t *testing.T) {
 		t.Errorf("expected %s, got %s", expected, result)
 	}
 }
+
+func TestExpandGlobPatterns(t *testing.T) {
+	testCases := []struct {
+		name     string
+		patterns []string
+		expected []string
+	}{
+		{
+			name:     "no patterns",
+			patterns: []string{},
+			expected: []string{},
+		},
+		{
+			name:     "single file",
+			patterns: []string{"examples/sample.json"},
+			expected: []string{"examples/sample.json"},
+		},
+		{
+			name:     "glob pattern",
+			patterns: []string{"examples/multiple-files/2025-01/*.json"},
+			expected: []string{
+				"examples/multiple-files/2025-01/01.json",
+				"examples/multiple-files/2025-01/02.json",
+				"examples/multiple-files/2025-01/03.json",
+			},
+		},
+		{
+			name:     "multiple patterns",
+			patterns: []string{"examples/multiple-files/2025-01/01.json", "examples/multiple-files/2025-02/01.json"},
+			expected: []string{
+				"examples/multiple-files/2025-01/01.json",
+				"examples/multiple-files/2025-02/01.json",
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result, err := expandGlobPatterns(tc.patterns)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if len(result) != len(tc.expected) {
+				t.Errorf("expected %d files, got %d: %v", len(tc.expected), len(result), result)
+			}
+
+			// Check that all expected files are present (order may vary)
+			for _, expected := range tc.expected {
+				found := false
+				for _, actual := range result {
+					if actual == expected {
+						found = true
+						break
+					}
+				}
+				if !found {
+					t.Errorf("expected file %s not found in result: %v", expected, result)
+				}
+			}
+		})
+	}
+}
+
+func TestExecuteJQMultiFiles(t *testing.T) {
+	// Create test data
+	jsonData1 := map[string]interface{}{
+		"transactions": []interface{}{
+			map[string]interface{}{"id": "txn_001", "amount": float64(100)},
+			map[string]interface{}{"id": "txn_002", "amount": float64(200)},
+		},
+	}
+
+	jsonData2 := map[string]interface{}{
+		"transactions": []interface{}{
+			map[string]interface{}{"id": "txn_003", "amount": float64(150)},
+		},
+	}
+
+	jsonDataList := []interface{}{jsonData1, jsonData2}
+
+	// Test query that uses inputs
+	result, err := executeJQMultiFiles("[inputs | .transactions[] | select(.amount > 120)]", jsonDataList)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Parse result to verify
+	var transactions []interface{}
+	if err := json.Unmarshal([]byte(result), &transactions); err != nil {
+		t.Fatalf("failed to parse result: %v", err)
+	}
+
+	if len(transactions) != 2 {
+		t.Errorf("expected 2 transactions, got %d", len(transactions))
+	}
+}
+
+func TestValidateAndReadJSONFiles(t *testing.T) {
+	testCases := []struct {
+		name        string
+		filePaths   []string
+		expectError bool
+	}{
+		{
+			name:        "valid files",
+			filePaths:   []string{"examples/sample.json"},
+			expectError: false,
+		},
+		{
+			name:        "multiple valid files",
+			filePaths:   []string{"examples/multiple-files/2025-01/01.json", "examples/multiple-files/2025-01/02.json"},
+			expectError: false,
+		},
+		{
+			name:        "nonexistent file",
+			filePaths:   []string{"examples/nonexistent.json"},
+			expectError: true,
+		},
+		{
+			name:        "directory instead of file",
+			filePaths:   []string{"examples"},
+			expectError: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result, err := validateAndReadJSONFiles(tc.filePaths)
+
+			if tc.expectError {
+				if err == nil {
+					t.Error("expected error but got none")
+				}
+			} else {
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+				if len(result) != len(tc.filePaths) {
+					t.Errorf("expected %d JSON objects, got %d", len(tc.filePaths), len(result))
+				}
+			}
+		})
+	}
+}
