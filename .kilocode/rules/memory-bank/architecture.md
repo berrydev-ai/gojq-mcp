@@ -73,8 +73,9 @@ All JSON file processing follows a strict validation sequence:
 
 #### MCP Protocol Implementation
 - Uses mark3labs/mcp-go library for protocol compliance
-- Supports multiple transport layers
-- Extensible tool architecture
+- Supports multiple transport layers (stdio, HTTP, SSE)
+- Extensible tool architecture with comprehensive documentation in docs/mcp-go/
+- Follows MCP-Go patterns for server/client implementation
 
 #### Error Handling Strategy
 - Early validation with descriptive error messages
