@@ -8,6 +8,8 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/berrydev-ai/gojq-mcp/jq"
 )
 
 func TestExecuteJQ_SimpleQuery(t *testing.T) {
@@ -16,7 +18,7 @@ func TestExecuteJQ_SimpleQuery(t *testing.T) {
 		"age":  float64(30),
 	}
 
-	result, err := executeJQ(".name", jsonData)
+	result, err := jq.ExecuteJQ(".name", jsonData)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -33,7 +35,7 @@ func TestExecuteJQ_NumericQuery(t *testing.T) {
 		"age":  float64(30),
 	}
 
-	result, err := executeJQ(".age", jsonData)
+	result, err := jq.ExecuteJQ(".age", jsonData)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -52,7 +54,7 @@ func TestExecuteJQ_ArrayAccess(t *testing.T) {
 		},
 	}
 
-	result, err := executeJQ(".users[0].name", jsonData)
+	result, err := jq.ExecuteJQ(".users[0].name", jsonData)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -71,7 +73,7 @@ func TestExecuteJQ_ArrayMap(t *testing.T) {
 		},
 	}
 
-	result, err := executeJQ(".users[].name", jsonData)
+	result, err := jq.ExecuteJQ(".users[].name", jsonData)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -103,7 +105,7 @@ func TestExecuteJQ_NestedAccess(t *testing.T) {
 		},
 	}
 
-	result, err := executeJQ(".user.address.city", jsonData)
+	result, err := jq.ExecuteJQ(".user.address.city", jsonData)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -123,7 +125,7 @@ func TestExecuteJQ_FilterWithSelect(t *testing.T) {
 		},
 	}
 
-	result, err := executeJQ(".users[] | select(.age > 28) | .name", jsonData)
+	result, err := jq.ExecuteJQ(".users[] | select(.age > 28) | .name", jsonData)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -145,7 +147,7 @@ func TestExecuteJQ_KeysQuery(t *testing.T) {
 		"city": "NYC",
 	}
 
-	result, err := executeJQ("keys", jsonData)
+	result, err := jq.ExecuteJQ("keys", jsonData)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -165,7 +167,7 @@ func TestExecuteJQ_InvalidFilter(t *testing.T) {
 		"name": "John Doe",
 	}
 
-	_, err := executeJQ(".[invalid", jsonData)
+	_, err := jq.ExecuteJQ(".[invalid", jsonData)
 	if err == nil {
 		t.Fatal("expected error for invalid filter, got nil")
 	}
@@ -180,7 +182,7 @@ func TestExecuteJQ_NonExistentKey(t *testing.T) {
 		"name": "John Doe",
 	}
 
-	result, err := executeJQ(".nonexistent", jsonData)
+	result, err := jq.ExecuteJQ(".nonexistent", jsonData)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -196,7 +198,7 @@ func TestExecuteJQ_EmptyArray(t *testing.T) {
 		"items": []interface{}{},
 	}
 
-	result, err := executeJQ(".items", jsonData)
+	result, err := jq.ExecuteJQ(".items", jsonData)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -248,7 +250,7 @@ func TestExtractBearerToken(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			token, ok := extractBearerToken(tc.header)
+			token, ok := auth.ExtractBearerToken(tc.header)
 			if ok != tc.expectsOK {
 				t.Fatalf("expected ok=%v, got %v", tc.expectsOK, ok)
 			}
@@ -295,7 +297,7 @@ func TestAuthorizeHTTPBearer(t *testing.T) {
 			if tc.header != "" {
 				req.Header.Set("Authorization", tc.header)
 			}
-			if got := authorizeHTTPBearer(expectedToken, req); got != tc.wantOK {
+			if got := auth.AuthorizeHTTPBearer(expectedToken, req); got != tc.wantOK {
 				t.Fatalf("expected %v, got %v", tc.wantOK, got)
 			}
 		})
@@ -348,7 +350,7 @@ func TestAuthorizeSSEToken(t *testing.T) {
 			if tc.header != "" {
 				req.Header.Set("Authorization", tc.header)
 			}
-			if got := authorizeSSEToken(expectedToken, req); got != tc.wantOK {
+			if got := auth.AuthorizeSSEToken(expectedToken, req); got != tc.wantOK {
 				t.Fatalf("expected %v, got %v", tc.wantOK, got)
 			}
 		})
@@ -361,7 +363,7 @@ func TestExecuteJQ_IdentityFilter(t *testing.T) {
 		"age":  float64(30),
 	}
 
-	result, err := executeJQ(".", jsonData)
+	result, err := jq.ExecuteJQ(".", jsonData)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -409,7 +411,7 @@ func TestExecuteJQ_ComplexNestedData(t *testing.T) {
 		t.Fatalf("failed to parse test JSON: %v", err)
 	}
 
-	result, err := executeJQ(".users[].address.city", jsonData)
+	result, err := jq.ExecuteJQ(".users[].address.city", jsonData)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -435,7 +437,7 @@ func TestExecuteJQ_LengthQuery(t *testing.T) {
 		"items": []interface{}{1, 2, 3, 4, 5},
 	}
 
-	result, err := executeJQ(".items | length", jsonData)
+	result, err := jq.ExecuteJQ(".items | length", jsonData)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -452,7 +454,7 @@ func TestExecuteJQ_TypeQuery(t *testing.T) {
 		"age":  float64(30),
 	}
 
-	result, err := executeJQ(".age | type", jsonData)
+	result, err := jq.ExecuteJQ(".age | type", jsonData)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -500,7 +502,7 @@ func TestExpandGlobPatterns(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			result, err := expandGlobPatterns(tc.patterns)
+			result, err := jq.ExpandGlobPatterns(tc.patterns)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -544,7 +546,7 @@ func TestExecuteJQMultiFiles(t *testing.T) {
 	jsonDataList := []interface{}{jsonData1, jsonData2}
 
 	// Test query that uses inputs
-	result, err := executeJQMultiFiles("[inputs | .transactions[] | select(.amount > 120)]", jsonDataList)
+	result, err := jq.ExecuteJQMultiFiles("[inputs | .transactions[] | select(.amount > 120)]", jsonDataList)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -590,7 +592,7 @@ func TestValidateAndReadJSONFiles(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			result, err := validateAndReadJSONFiles(tc.filePaths)
+			result, err := jq.ValidateAndReadJSONFiles(tc.filePaths)
 
 			if tc.expectError {
 				if err == nil {
