@@ -1,0 +1,20 @@
+{
+  "transactions": [
+    {
+      "id": "txn_007",
+      "created_at": "2025-02-01T08:15:00.000-06:00",
+      "amount": 300.00,
+      "payout": 285.00,
+      "description": "Mobile app development",
+      "category": "services"
+    },
+    {
+      "id": "txn_008",
+      "created_at": "2025-02-01T13:45:00.000-06:00",
+      "amount": 67.99,
+      "payout": 64.59,
+      "description": "SSL certificate",
+      "category": "security"
+    }
+  ]
+}

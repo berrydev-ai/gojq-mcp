@@ -1,0 +1,41 @@
+data_path: ./data
+transport: http
+port: 8080
+instructions: |
+  This server provides access to marketing analytics data spanning Q1 2025.
+
+  Dataset includes:
+  - ads.json: 36 ads across 6 campaigns and 6 platforms
+  - impressions/: Weekly and monthly impression data with CTR tracking
+  - conversions/: Monthly conversion data with attribution models
+  - revenue/: Daily transaction data with product details
+
+  Use 'inputs' for multi-file queries. Files support glob patterns.
+
+  Common patterns:
+  - impressions/weekly/*.json - All weekly impression files
+  - impressions/monthly/2025/*.json - Monthly aggregates
+  - conversions/2025-*.json - All conversion files
+  - revenue/2025-01-*.json - January revenue files
+
+prompts:
+  - name: campaign_performance
+    description: "Analyze campaign performance metrics"
+    arguments:
+      - name: campaign_id
+        description: "Campaign to analyze (e.g., spring_sale_2025)"
+        required: true
+
+  - name: monthly_summary
+    description: "Generate monthly marketing summary"
+    arguments:
+      - name: month
+        description: "Month in YYYY-MM format (e.g., 2025-01)"
+        required: true
+
+  - name: roi_analysis
+    description: "Calculate ROI for campaigns"
+    arguments:
+      - name: time_period
+        description: "Time period (weekly, monthly, or date range)"
+        required: true

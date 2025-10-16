@@ -25,3 +25,27 @@ go.work
 *.swo
 *~
 .DS_Store
+
+# Go cache
+.gomodcache
+
+# Kilo Code rules
+.kilocode/rules/memory-bank/context.md
+!.kilocode/rules/memory-bank/architecture.md
+!.kilocode/rules/memory-bank/brief.md
+!.kilocode/rules/memory-bank/product.md
+!.kilocode/rules/memory-bank/memory-bank-instructions.md
+!.kilocode/rules/memory-bank/tech.md
+
+# Qdrant storage
+qdrant_storage/*
+raft_state.json
+
+# Local working files
+.local/
+
+# Reference documentation
+docs/mcp-go
+
+# Example Datasets
+examples/marketing-firm/data

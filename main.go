@@ -1,364 +1,206 @@
 package main
 
 import (
-	"context"
-	"crypto/subtle"
-	"encoding/json"
 	"flag"
 	"fmt"
-	"net/http"
 	"os"
-	"path/filepath"
 	"strings"
 
-	"github.com/itchyny/gojq"
-	"github.com/mark3labs/mcp-go/mcp"
-	"github.com/mark3labs/mcp-go/server"
+	"github.com/berrydev-ai/gojq-mcp/cli"
+	"github.com/berrydev-ai/gojq-mcp/config"
+	"github.com/berrydev-ai/gojq-mcp/registry"
+	"github.com/berrydev-ai/gojq-mcp/server"
 )
 
-const version = "1.0.3"
+const version = "1.0.5"
 
 func printUsage() {
 	fmt.Fprintf(os.Stderr, `gojq-mcp v%s - A dual-mode JSON query tool
 
 USAGE:
-  gojq-mcp [OPTIONS]
+   gojq-mcp [OPTIONS]
 
 MODES:
-  CLI Mode:    gojq-mcp -f <file> -q <query>
-  Server Mode: gojq-mcp [-t <transport>] [-a <address>]
+   CLI Mode:         gojq-mcp -f <file> -q <query>
+   Server Mode:      gojq-mcp -p <path> [-c <config>] [-i <instructions>]
+   Generate Config:  gojq-mcp generate-config -p <path> [-o <output>]
 
 OPTIONS:
-  -f <file>       Path to JSON file (CLI mode)
-  -q <query>      jq query to execute (CLI mode)
-  -t <transport>  Transport type: stdio, http, or sse (default: stdio)
-  -a <address>    Address to listen on for http/sse (default: :8080)
-  -token <token>  Bearer token required by http/sse transports
-  --default-json-file <file>
-                  Default JSON file path for http/sse transports
-  --version       Display version information
-  --help          Display this help message
+    -f <file>       Path to JSON file (CLI mode, can be used multiple times)
+    -q <query>      jq query to execute (CLI mode)
+   -p <path>       Path to folder containing JSON files
+   -c <config>     Path to YAML configuration file (Server mode)
+   -i <instructions> Server instructions for LLM (overrides config)
+   -o <output>     Output file for generated config (default: config.yaml)
+   -t <transport>  Transport type: stdio, http, or sse (overrides config, default: stdio)
+   -a <address>    Address to listen on for http/sse (overrides config, default: :8080)
+   -token <token>  Bearer token required by http/sse transports
+   -watch          Enable file system watching (default: true)
+   --version       Display version information
+   --help          Display this help message
+
+FEATURES:
+   • Generate config files with prompts and instructions
+   • YAML configuration for transport, port, instructions, and prompts
+   • Real-time file monitoring with automatic client notifications
+   • HTTP streaming transport for push notifications
 
 EXAMPLES:
-  # CLI mode - query a JSON file
-  gojq-mcp -f data.json -q '.users[] | select(.age > 30)'
+    # Generate a config file
+    gojq-mcp generate-config -p ./data -o config.yaml
 
-  # Server mode - stdio transport (default)
-  gojq-mcp
+    # CLI mode - query a single JSON file
+    gojq-mcp -f data.json -q '.users[] | select(.age > 30)'
 
-  # Server mode - HTTP transport
-  gojq-mcp -t http
-  gojq-mcp -t http -a :9000
+    # CLI mode - query multiple specific files
+    gojq-mcp -f file1.json -f file2.json -q '.transactions[] | .amount | add'
 
-  # Server mode - SSE transport
-  gojq-mcp -t sse
-  gojq-mcp -t sse -a :8080
+    # CLI mode - query files using glob patterns
+    gojq-mcp -f './data/*.json' -q '.transactions[] | .amount | add'
+
+    # Server mode with config file
+    gojq-mcp -p ./data -c config.yaml
+
+    # Server mode with CLI overrides
+    gojq-mcp -p ./data -c config.yaml -t http -a :9000
 
 DOCUMENTATION:
-  https://github.com/berrydev-ai/gojq-mcp
+   https://github.com/berrydev-ai/gojq-mcp
 
 `, version)
 }
 
-// executeJQ runs a jq query on JSON data and returns the results as a JSON string
-func executeJQ(jqFilter string, jsonData interface{}) (string, error) {
-	// Parse the jq filter
-	query, err := gojq.Parse(jqFilter)
-	if err != nil {
-		return "", fmt.Errorf("invalid jq filter: %w", err)
-	}
-
-	// Execute the query on the JSON data
-	iter := query.Run(jsonData)
-	var results []interface{}
-
-	for {
-		v, ok := iter.Next()
-		if !ok {
-			break
-		}
-		if err, ok := v.(error); ok {
-			// Check for halt errors (normal termination)
-			if haltErr, ok := err.(*gojq.HaltError); ok && haltErr.Value() == nil {
-				break
-			}
-			return "", fmt.Errorf("jq execution error: %w", err)
-		}
-		results = append(results, v)
-	}
-
-	// If only one result, return it directly; otherwise return as array
-	var output []byte
-	if len(results) == 1 {
-		output, err = json.MarshalIndent(results[0], "", "  ")
-	} else {
-		output, err = json.MarshalIndent(results, "", "  ")
-	}
-
-	if err != nil {
-		return "", fmt.Errorf("error formatting results: %w", err)
-	}
-
-	return string(output), nil
-}
-
-// runCLIMode executes jq query on a file and prints the result
-func runCLIMode(filePath, query string) {
-	// Read the JSON file
-	data, err := os.ReadFile(filePath)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error reading file: %v\n", err)
-		os.Exit(1)
-	}
-
-	// Parse JSON
-	var jsonData interface{}
-	if err := json.Unmarshal(data, &jsonData); err != nil {
-		fmt.Fprintf(os.Stderr, "Error parsing JSON: %v\n", err)
-		os.Exit(1)
-	}
-
-	// Execute jq query
-	result, err := executeJQ(query, jsonData)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error executing jq query: %v\n", err)
-		os.Exit(1)
-	}
-
-	// Print result
-	fmt.Println(result)
-}
-
-func extractBearerToken(header string) (string, bool) {
-	const bearerPrefix = "Bearer "
-	if header == "" {
-		return "", false
-	}
-	if len(header) < len(bearerPrefix) || !strings.EqualFold(header[:len(bearerPrefix)], bearerPrefix) {
-		return "", false
-	}
-	token := strings.TrimSpace(header[len(bearerPrefix):])
-	if token == "" {
-		return "", false
-	}
-	return token, true
-}
-
-func tokensMatch(expected, candidate string) bool {
-	if expected == "" {
-		return true
-	}
-	if candidate == "" || len(candidate) != len(expected) {
-		return false
-	}
-	return subtle.ConstantTimeCompare([]byte(expected), []byte(candidate)) == 1
-}
-
-func authorizeHTTPBearer(expected string, r *http.Request) bool {
-	if expected == "" {
-		return true
-	}
-	candidate, ok := extractBearerToken(r.Header.Get("Authorization"))
-	if !ok {
-		return false
-	}
-	return tokensMatch(expected, candidate)
-}
-
-func authorizeSSEToken(expected string, r *http.Request) bool {
-	if expected == "" {
-		return true
-	}
-	if tokensMatch(expected, r.URL.Query().Get("token")) {
-		return true
-	}
-	if candidate, ok := extractBearerToken(r.Header.Get("Authorization")); ok {
-		return tokensMatch(expected, candidate)
-	}
-	return false
-}
-
-func writeUnauthorized(w http.ResponseWriter) {
-	w.Header().Set("WWW-Authenticate", "Bearer realm=\"gojq-mcp\"")
-	http.Error(w, "Unauthorized", http.StatusUnauthorized)
-}
-
 func main() {
-	// Custom usage function
 	flag.Usage = printUsage
 
-	// Parse CLI flags
-	filePath := flag.String("f", "", "Path to JSON file")
+	filePaths := make([]string, 0)
 	query := flag.String("q", "", "jq query to execute")
-	transport := flag.String("t", "stdio", "Transport type: stdio, http, or sse")
-	address := flag.String("a", ":8080", "Address to listen on (for http/sse transports)")
-	defaultJSON := flag.String("default-json-file", "", "Default JSON file path for http/sse transports")
+	dataPath := flag.String("p", "", "Path to folder containing JSON files")
+	configPath := flag.String("c", "", "Path to YAML configuration file")
+	instructions := flag.String("i", "", "Server instructions for LLM (overrides config)")
+	transport := flag.String("t", "", "Transport type: stdio, http, or sse (overrides config)")
+	address := flag.String("a", "", "Address to listen on (overrides config)")
 	tokenFlag := flag.String("token", "", "Bearer token required by http/sse transports")
+	enableWatch := flag.Bool("watch", true, "Enable file system watching")
 	showVersion := flag.Bool("version", false, "Display version information")
-	flag.Parse()
 
-	// Handle version flag
+	// Custom flag parsing to support multiple -f flags
+	// We need to parse -f flags manually since Go's flag package doesn't support repeated flags
+	// Extract -f flags and remove them from args before calling flag.Parse()
+	args := os.Args[1:]
+	filteredArgs := make([]string, 0, len(args))
+	for i := 0; i < len(args); i++ {
+		if args[i] == "-f" && i+1 < len(args) {
+			filePaths = append(filePaths, args[i+1])
+			i++ // Skip the next argument since we consumed it
+		} else {
+			filteredArgs = append(filteredArgs, args[i])
+		}
+	}
+
+	// Temporarily replace os.Args for flag.Parse()
+	oldArgs := os.Args
+	os.Args = append([]string{os.Args[0]}, filteredArgs...)
+	flag.Parse()
+	os.Args = oldArgs
+
 	if *showVersion {
 		fmt.Printf("gojq-mcp version %s\n", version)
 		return
 	}
 
+	// Determine auth token: CLI flag overrides config
 	authToken := strings.TrimSpace(*tokenFlag)
 
-	resolvedDefaultJSONPath := ""
-	if *defaultJSON != "" {
-		absPath, err := filepath.Abs(*defaultJSON)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error resolving default JSON file path: %v\n", err)
-			os.Exit(1)
-		}
-		resolvedDefaultJSONPath = absPath
-	}
-
-	// If CLI flags are provided, run in CLI mode
-	if *filePath != "" && *query != "" {
-		runCLIMode(*filePath, *query)
+	// CLI mode
+	if len(filePaths) > 0 && *query != "" {
+		cli.RunCLIMode(filePaths, *query)
 		return
 	}
 
-	// Otherwise, run in MCP server mode
-	// Create a new MCP server
-	s := server.NewMCPServer(
-		"GoJQ MCP Server",
-		"1.0.0",
-		server.WithToolCapabilities(false),
-		server.WithRecovery(),
-	)
-
-	// Add a jq query tool
-	jsonFileDescription := "Absolute path to the JSON file to process"
-	if resolvedDefaultJSONPath != "" && *transport != "stdio" {
-		jsonFileDescription = "Absolute path to the JSON file to process (optional when a default is configured)"
+	// Server mode - load config or use defaults
+	var cfg *config.Config
+	if *configPath != "" {
+		var err error
+		cfg, err = config.LoadConfig(*configPath)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error loading config: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Fprintf(os.Stderr, "✅ Loaded configuration from %s\n", *configPath)
+	} else {
+		// Default config
+		cfg = &config.Config{
+			Transport: "stdio",
+			Port:      8080,
+		}
 	}
-	jsonFileArgOptions := []mcp.PropertyOption{mcp.Description(jsonFileDescription)}
-	if *transport == "stdio" || resolvedDefaultJSONPath == "" {
-		jsonFileArgOptions = append(jsonFileArgOptions, mcp.Required())
+
+	// Override config with CLI flags if provided
+	if *dataPath != "" {
+		cfg.DataPath = *dataPath
+	}
+	if *transport != "" {
+		cfg.Transport = *transport
+	}
+	if *address != "" {
+		// Parse port from address
+		parts := strings.Split(*address, ":")
+		if len(parts) == 2 {
+			fmt.Sscanf(parts[1], "%d", &cfg.Port)
+		}
+	}
+	if *instructions != "" {
+		cfg.Instructions = *instructions
+	}
+	// Use config auth token if no flag was provided
+	if authToken == "" && cfg.AuthToken != "" {
+		authToken = cfg.AuthToken
 	}
 
-	runJqTool := mcp.NewTool("run_jq",
-		mcp.WithDescription("Queries the JSON data using a jq query."),
-		mcp.WithString("jq_filter",
-			mcp.Required(),
-			mcp.Description("The jq filter to execute"),
-		),
-		mcp.WithString("json_file_path", jsonFileArgOptions...),
-	)
-
-	// Add the run_jq handler
-	s.AddTool(runJqTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		// Get arguments
-		jqFilter, err := request.RequireString("jq_filter")
-		if err != nil {
-			return mcp.NewToolResultError(err.Error()), nil
-		}
-
-		jsonFilePath := ""
-		if args := request.GetArguments(); args != nil {
-			if rawPath, ok := args["json_file_path"]; ok {
-				pathStr, ok := rawPath.(string)
-				if !ok {
-					return mcp.NewToolResultError("argument \"json_file_path\" is not a string"), nil
-				}
-				jsonFilePath = pathStr
-			}
-		}
-
-		if jsonFilePath == "" {
-			if *transport != "stdio" && resolvedDefaultJSONPath != "" {
-				jsonFilePath = resolvedDefaultJSONPath
-			} else {
-				return mcp.NewToolResultError("required argument \"json_file_path\" not found"), nil
-			}
-		}
-
-		// 1. Check if file exists
-		fileInfo, err := os.Stat(jsonFilePath)
-		if err != nil {
-			if os.IsNotExist(err) {
-				return mcp.NewToolResultError(fmt.Sprintf("file does not exist: %s", jsonFilePath)), nil
-			}
-			return mcp.NewToolResultError(fmt.Sprintf("error accessing file: %v", err)), nil
-		}
-
-		// Ensure it's a file, not a directory
-		if fileInfo.IsDir() {
-			return mcp.NewToolResultError(fmt.Sprintf("path is a directory, not a file: %s", jsonFilePath)), nil
-		}
-
-		// 2. Check if file is readable and read contents
-		data, err := os.ReadFile(jsonFilePath)
-		if err != nil {
-			return mcp.NewToolResultError(fmt.Sprintf("file is not readable: %v", err)), nil
-		}
-
-		// 3. Check if contents are valid JSON
-		var jsonData interface{}
-		if err := json.Unmarshal(data, &jsonData); err != nil {
-			return mcp.NewToolResultError(fmt.Sprintf("file does not contain valid JSON: %v", err)), nil
-		}
-
-		// 4. Execute jq filter on the parsed JSON data
-		results, err := executeJQ(jqFilter, jsonData)
-		if err != nil {
-			return mcp.NewToolResultError(err.Error()), nil
-		}
-
-		return mcp.NewToolResultText(results), nil
-	})
-
-	// Start the server with the specified transport
-	var err error
-	switch *transport {
-	case "stdio":
-		fmt.Fprintln(os.Stderr, "Starting MCP server with stdio transport...")
-		err = server.ServeStdio(s)
-	case "http":
-		fmt.Fprintf(os.Stderr, "Starting MCP server with HTTP transport on %s...\n", *address)
-		if authToken != "" {
-			var httpServer *server.StreamableHTTPServer
-			handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				if !authorizeHTTPBearer(authToken, r) {
-					writeUnauthorized(w)
-					return
-				}
-				httpServer.ServeHTTP(w, r)
-			})
-			srv := &http.Server{Addr: *address, Handler: handler}
-			httpServer = server.NewStreamableHTTPServer(s, server.WithStreamableHTTPServer(srv))
-			err = httpServer.Start(*address)
-		} else {
-			httpServer := server.NewStreamableHTTPServer(s)
-			err = httpServer.Start(*address)
-		}
-	case "sse":
-		fmt.Fprintf(os.Stderr, "Starting MCP server with SSE transport on %s...\n", *address)
-		if authToken != "" {
-			var sseServerInstance *server.SSEServer
-			handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				if !authorizeSSEToken(authToken, r) {
-					writeUnauthorized(w)
-					return
-				}
-				sseServerInstance.ServeHTTP(w, r)
-			})
-			srv := &http.Server{Addr: *address, Handler: handler}
-			opts := []server.SSEOption{server.WithHTTPServer(srv), server.WithAppendQueryToMessageEndpoint()}
-			sseServerInstance = server.NewSSEServer(s, opts...)
-			err = sseServerInstance.Start(*address)
-		} else {
-			sseServer := server.NewSSEServer(s)
-			err = sseServer.Start(*address)
-		}
-	default:
-		fmt.Fprintf(os.Stderr, "Error: invalid transport type '%s'. Must be 'stdio', 'http', or 'sse'\n", *transport)
+	// Verify data path is set
+	if cfg.DataPath == "" {
+		fmt.Fprintf(os.Stderr, "Error: data path is required. Use -p flag or set data_path in config\n\n")
+		printUsage()
 		os.Exit(1)
 	}
 
+	// Verify data path exists
+	if info, err := os.Stat(cfg.DataPath); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: data path does not exist: %s\n", cfg.DataPath)
+		os.Exit(1)
+	} else if !info.IsDir() {
+		fmt.Fprintf(os.Stderr, "Error: data path is not a directory: %s\n", cfg.DataPath)
+		os.Exit(1)
+	}
+
+	// Create file registry
+	fileRegistry, err := registry.NewFileRegistry(cfg.DataPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error initializing file registry: %v\n", err)
+		os.Exit(1)
+	}
+	defer fileRegistry.Close()
+
+	// Create MCP server
+	s, err := server.SetupMCPServer(cfg, fileRegistry)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error setting up MCP server: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Start file watching if enabled
+	if *enableWatch {
+		if err := fileRegistry.StartWatching(); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: could not enable file watching: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Continuing without file watching...\n")
+		} else {
+			fmt.Fprintf(os.Stderr, "✅ Push notifications enabled - clients will be notified of file changes\n")
+		}
+	}
+
+	// Start the server
+	err = server.StartServer(s, cfg, authToken)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Server error: %v\n", err)
 		os.Exit(1)

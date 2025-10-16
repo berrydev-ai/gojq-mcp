@@ -17,22 +17,19 @@ install:
 	go install
 
 run-cli:
-	go run . -f examples/sample.json -q '.'
+	go run . -f ./examples/data/sample.json -q '.'
 
-run-build: build
-	./dist/gojq-mcp -f ./examples/sample.json -q '.'
+run-cli-build: build
+	./dist/gojq-mcp -f ./examples/data/sample.json -q '.'
 
 run-inspector: build
-	npx @modelcontextprotocol/inspector go run .
-
-run-inspector-default-path:
-	npx @modelcontextprotocol/inspector go run . -t http --default-json-file ./examples/sample.json -a :9001
+	DANGEROUSLY_OMIT_AUTH=true npx @modelcontextprotocol/inspector go run .
 
 run-server:
-	go run .
+	go run . -p ./examples/data
 
 run-http:
-	go run . -t http
+	go run . -c ./config.sample.yml
 
 run-http-custom:
 	go run . -t http -a :9000
@@ -42,3 +39,6 @@ run-sse:
 
 run-sse-custom:
 	go run . -t sse -a :9000
+
+run-marketing-firm-example: build
+	cd examples/marketing-firm && ../../dist/gojq-mcp -c ./config.yml

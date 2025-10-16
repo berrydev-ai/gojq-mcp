@@ -1,0 +1,28 @@
+{
+  "transactions": [
+    {
+      "id": "txn_003",
+      "created_at": "2025-01-02T09:45:00.000-06:00",
+      "amount": 200.00,
+      "payout": 190.00,
+      "description": "Web development project",
+      "category": "services"
+    },
+    {
+      "id": "txn_004",
+      "created_at": "2025-01-02T16:20:00.000-06:00",
+      "amount": 45.99,
+      "payout": 43.69,
+      "description": "Domain registration",
+      "category": "domains"
+    },
+    {
+      "id": "txn_005",
+      "created_at": "2025-01-02T18:30:00.000-06:00",
+      "amount": 89.99,
+      "payout": 85.49,
+      "description": "Cloud hosting",
+      "category": "hosting"
+    }
+  ]
+}

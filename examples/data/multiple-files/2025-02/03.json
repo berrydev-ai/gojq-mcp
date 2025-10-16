@@ -1,0 +1,20 @@
+{
+  "transactions": [
+    {
+      "id": "txn_011",
+      "created_at": "2025-02-03T12:00:00.000-06:00",
+      "amount": 95.00,
+      "payout": 90.25,
+      "description": "Security audit",
+      "category": "security"
+    },
+    {
+      "id": "txn_012",
+      "created_at": "2025-02-03T17:45:00.000-06:00",
+      "amount": 55.99,
+      "payout": 53.19,
+      "description": "Monitoring setup",
+      "category": "infrastructure"
+    }
+  ]
+}
