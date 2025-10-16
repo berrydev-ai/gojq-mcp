@@ -26,7 +26,10 @@ go.work
 *~
 .DS_Store
 
+# Go cache
+.gocache
 
+# Kilo Code rules
 .kilocode/rules/memory-bank/context.md
 !.kilocode/rules/memory-bank/architecture.md
 !.kilocode/rules/memory-bank/brief.md
@@ -34,5 +37,9 @@ go.work
 !.kilocode/rules/memory-bank/memory-bank-instructions.md
 !.kilocode/rules/memory-bank/tech.md
 
+# Qdrant storage
 qdrant_storage/*
 raft_state.json
+
+# Local files
+.local/

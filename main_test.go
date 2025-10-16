@@ -2,8 +2,11 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
+	"flag"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -599,6 +602,68 @@ func TestValidateAndReadJSONFiles(t *testing.T) {
 				}
 				if len(result) != len(tc.filePaths) {
 					t.Errorf("expected %d JSON objects, got %d", len(tc.filePaths), len(result))
+				}
+			}
+		})
+	}
+}
+
+func TestParseGenerateConfigArgs(t *testing.T) {
+	testCases := []struct {
+		name            string
+		args            []string
+		wantDataPath    string
+		wantOutputPath  string
+		wantErr         error
+		wantErrContains string
+	}{
+		{
+			name:           "with explicit output",
+			args:           []string{"-p", "/tmp/data", "-o", "cfg.yaml"},
+			wantDataPath:   "/tmp/data",
+			wantOutputPath: "cfg.yaml",
+		},
+		{
+			name:           "defaults output path",
+			args:           []string{"-p", "/tmp/data"},
+			wantDataPath:   "/tmp/data",
+			wantOutputPath: "config.yaml",
+		},
+		{
+			name:            "missing data path",
+			args:            []string{},
+			wantErrContains: "-p <path> is required",
+		},
+		{
+			name:    "help flag exits early",
+			args:    []string{"-h"},
+			wantErr: flag.ErrHelp,
+		},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			dataPath, outputPath, err := parseGenerateConfigArgs(tc.args)
+
+			switch {
+			case tc.wantErr != nil:
+				if !errors.Is(err, tc.wantErr) {
+					t.Fatalf("expected error %v, got %v", tc.wantErr, err)
+				}
+			case tc.wantErrContains != "":
+				if err == nil || !strings.Contains(err.Error(), tc.wantErrContains) {
+					t.Fatalf("expected error containing %q, got %v", tc.wantErrContains, err)
+				}
+			default:
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+				if dataPath != tc.wantDataPath {
+					t.Fatalf("expected data path %q, got %q", tc.wantDataPath, dataPath)
+				}
+				if outputPath != tc.wantOutputPath {
+					t.Fatalf("expected output path %q, got %q", tc.wantOutputPath, outputPath)
 				}
 			}
 		})

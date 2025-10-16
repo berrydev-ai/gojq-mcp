@@ -1,0 +1,87 @@
+# GoJQ MCP Server Configuration
+
+# Path to the data directory. Can be overridden by the -p flag.
+data_path: ./data
+
+# Transport type: stdio, http, or sse. Default: stdio.
+# Recommended: http (for push notifications)
+transport: http
+
+# Port to listen on for http/sse transports. Default: 8080.
+port: 8080
+
+# Instructions for the MCP client. Can be overridden by the -i flag.
+instructions: |
+  You are a helpful assistant that can query and analyze JSON data files.
+
+  ## Available Tools
+
+  1. **list_data_files** - Discover all JSON files in the data directory
+     - Returns file paths, sizes, modification times
+     - Shows suggested query patterns for common operations
+
+  2. **run_jq** - Execute jq queries on JSON files
+     - Supports single files, multiple files, and glob patterns
+     - Use `[inputs]` to collect multiple files into an array
+     - Use `inputs | ...` to process files separately
+
+  ## Getting Started
+
+  1. Call `list_data_files` to see what's available
+  2. Use the suggested patterns to construct queries
+  3. Run jq filters with `run_jq` to extract data
+
+  ## Query Tips
+
+  - **Single file**: `json_file_path: "calls/2025-01-15.json"`
+  - **Multiple files**: `json_file_path: "calls/2025-01-15.json calls/2025-01-16.json"`
+  - **Glob patterns**: `json_file_path: "calls/2025-*.json"`
+  - **All files in directory**: `json_file_path: "calls/*.json"`
+
+  ## Common JQ Filters
+
+  - Get first 10 items: `.[0:10]`
+  - Filter by field: `.[] | select(.status == "completed")`
+  - Group and count: `group_by(.campaign_id) | map({id: .[0].campaign_id, count: length})`
+  - Collect multiple files: `[inputs]`
+  - Get total count: `[inputs | .[]] | length`
+
+  ## Real-Time Updates
+
+  This server watches for file changes and sends notifications automatically.
+  When you see a notification, call `list_data_files` again to see updates.
+
+# Reusable query templates.
+prompts:
+  - name: query_by_date
+    description: "Query data files for a specific date"
+    arguments:
+      - name: date
+        description: "Date in YYYY-MM-DD format"
+        required: true
+      - name: filter
+        description: "Optional jq filter (default: returns all data)"
+        required: false
+
+  - name: count_by_field
+    description: "Count occurrences grouped by a specific field"
+    arguments:
+      - name: file_pattern
+        description: "File pattern (e.g., 'calls/*.json')"
+        required: true
+      - name: field
+        description: "Field name to group by (e.g., 'status', 'campaign_id')"
+        required: true
+
+  - name: filter_by_value
+    description: "Filter records where a field matches a value"
+    arguments:
+      - name: file_pattern
+        description: "File pattern (e.g., 'calls/*.json')"
+        required: true
+      - name: field
+        description: "Field name to filter on"
+        required: true
+      - name: value
+        description: "Value to match"
+        required: true

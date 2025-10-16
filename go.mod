@@ -3,8 +3,10 @@ module github.com/berrydev-ai/gojq-mcp
 go 1.24.4
 
 require (
+	github.com/fsnotify/fsnotify v1.9.0
 	github.com/itchyny/gojq v0.12.17
 	github.com/mark3labs/mcp-go v0.41.1
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
@@ -17,5 +19,5 @@ require (
 	github.com/spf13/cast v1.7.1 // indirect
 	github.com/wk8/go-ordered-map/v2 v2.1.8 // indirect
 	github.com/yosida95/uritemplate/v3 v3.0.2 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
+	golang.org/x/sys v0.20.0 // indirect
 )
