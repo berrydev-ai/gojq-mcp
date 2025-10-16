@@ -28,8 +28,7 @@ instructions: |
   ## Getting Started
 
   1. Call `list_data_files` to see what's available
-  2. Use the suggested patterns to construct queries
-  3. Run jq filters with `run_jq` to extract data
+  2. Use the suggested patterns to construct queries  3. Run jq filters with `run_jq` to extract data
 
   ## Query Tips
 
