@@ -27,7 +27,7 @@ go.work
 .DS_Store
 
 # Go cache
-.gocache
+.gomodcache
 
 # Kilo Code rules
 .kilocode/rules/memory-bank/context.md
@@ -41,5 +41,8 @@ go.work
 qdrant_storage/*
 raft_state.json
 
-# Local files
+# Local working files
 .local/
+
+# Reference documentation
+docs/mcp-go

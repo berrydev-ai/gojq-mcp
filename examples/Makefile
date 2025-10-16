@@ -4,16 +4,6 @@
 DATA_DIR=./data
 CONFIG_FILE=config.yaml
 
-# Makefile targets
-# ------------------------------------------------------------
-# Generate config
-# ------------------------------------------------------------
-
-# Generate the default config
-.PHONY: generate-config
-generate-config:
-	go run ../main.go generate-config -p $(DATA_DIR) -o $(CONFIG_FILE)
-
 # ------------------------------------------------------------
 # CLI mode
 # ------------------------------------------------------------

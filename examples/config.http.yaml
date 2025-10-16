@@ -1,4 +1,4 @@
-# GoJQ MCP Server Configuration
+# GoJQ MCP Server Configuration for HTTP Mode
 
 # Path to the data directory. Can be overridden by the -p flag.
 data_path: ./data
@@ -13,6 +13,17 @@ port: 8080
 # Instructions for the MCP client. Can be overridden by the -i flag.
 instructions: |
   You are a helpful assistant that can query and analyze JSON data files.
+
+  ## Available Tools
+
+  1. **list_data_files** - Discover all JSON files in the data directory
+     - Returns file paths, sizes, modification times
+     - Shows suggested query patterns for common operations
+
+  2. **run_jq** - Execute jq queries on JSON files
+     - Supports single files, multiple files, and glob patterns
+     - Use `[inputs]` to collect multiple files into an array
+     - Use `inputs | ...` to process files separately
 
   ## Getting Started
 
