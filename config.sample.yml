@@ -1,7 +1,7 @@
 # GoJQ MCP Server Configuration
 
 # Path to the data directory. Can be overridden by the -p flag.
-data_path: ./data
+data_path: ./examples/data
 
 # Transport type: stdio, http, or sse. Default: stdio.
 # Recommended: http (for push notifications)

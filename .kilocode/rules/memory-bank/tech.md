@@ -27,12 +27,12 @@ make run-server
 # or
 ./dist/gojq-mcp
 
-# CLI mode (when implemented)
+# CLI mode
 make run-cli
 
-# HTTP/SSE transport server with default data
-go run . -t http --default-json-file $(pwd)/examples/sample.json
-go run . -t sse --default-json-file $(pwd)/examples/sample.json
+# HTTP/SSE transport server
+go run . -t http -a :8080
+go run . -t sse -a :8080
 ```
 
 ### Testing
@@ -85,13 +85,17 @@ go test -v -run TestExecuteJQ_SimpleQuery
 ### Indirect Dependencies
 - `github.com/bahlo/generic-list-go v0.2.0`: Generic list utilities
 - `github.com/buger/jsonparser v1.1.1`: Fast JSON parsing
+- `github.com/fsnotify/fsnotify v1.9.0`: File system watching
 - `github.com/google/uuid v1.6.0`: UUID generation
 - `github.com/invopop/jsonschema v0.13.0`: JSON schema validation
 - `github.com/itchyny/timefmt-go v0.1.6`: Time formatting
 - `github.com/mailru/easyjson v0.7.7`: JSON marshaling
+- `github.com/pmezard/go-difflib v1.0.0`: Diff utilities for testing
 - `github.com/spf13/cast v1.7.1`: Type conversion
+- `github.com/stretchr/testify v1.9.0`: Testing framework
 - `github.com/wk8/go-ordered-map/v2 v2.1.8`: Ordered map implementation
 - `github.com/yosida95/uritemplate/v3 v3.0.2`: URI template processing
+- `golang.org/x/sys v0.20.0`: System utilities
 - `gopkg.in/yaml.v3 v3.0.1`: YAML processing
 
 ## Tool Usage Patterns
