@@ -26,6 +26,8 @@ A dual-mode JSON query tool that operates both as an **MCP (Model Context Protoc
     - [Using Go Install](#using-go-install)
   - [Usage](#usage)
     - [MCP Server Mode](#mcp-server-mode)
+      - [stdio](#stdio)
+      - [streaming http](#streaming-http)
     - [CLI Mode](#cli-mode)
     - [HTTP and SSE Transports](#http-and-sse-transports)
     - [Configuration Files](#configuration-files)

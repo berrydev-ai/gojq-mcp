@@ -17,38 +17,17 @@ func TestLoadConfig(t *testing.T) {
 		expectError bool
 	}{
 		{
-			name: "valid config with all fields",
-			configYAML: `
-data_path: /data
+			name: "config with auth_token",
+			configYAML: `data_path: /data
 transport: http
 port: 9000
-instructions: "Test instructions"
-prompts:
-  - name: test_prompt
-    description: "A test prompt"
-    arguments:
-      - name: arg1
-        description: "First argument"
-        required: true
+auth_token: my-secret-token
 `,
 			expected: &Config{
-				DataPath:     "/data",
-				Transport:    "http",
-				Port:         9000,
-				Instructions: "Test instructions",
-				Prompts: []PromptConfig{
-					{
-						Name:        "test_prompt",
-						Description: "A test prompt",
-						Arguments: []PromptArgumentConfig{
-							{
-								Name:        "arg1",
-								Description: "First argument",
-								Required:    true,
-							},
-						},
-					},
-				},
+				DataPath:  "/data",
+				Transport: "http",
+				Port:      9000,
+				AuthToken: "my-secret-token",
 			},
 			expectError: false,
 		},

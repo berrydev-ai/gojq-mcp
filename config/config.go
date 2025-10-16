@@ -12,6 +12,7 @@ type Config struct {
 	DataPath     string         `yaml:"data_path"`
 	Transport    string         `yaml:"transport"`
 	Port         int            `yaml:"port"`
+	AuthToken    string         `yaml:"auth_token"`
 	Instructions string         `yaml:"instructions"`
 	Prompts      []PromptConfig `yaml:"prompts"`
 }

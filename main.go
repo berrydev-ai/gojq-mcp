@@ -109,6 +109,7 @@ func main() {
 		return
 	}
 
+	// Determine auth token: CLI flag overrides config
 	authToken := strings.TrimSpace(*tokenFlag)
 
 	// CLI mode
@@ -151,6 +152,10 @@ func main() {
 	}
 	if *instructions != "" {
 		cfg.Instructions = *instructions
+	}
+	// Use config auth token if no flag was provided
+	if authToken == "" && cfg.AuthToken != "" {
+		authToken = cfg.AuthToken
 	}
 
 	// Verify data path is set
