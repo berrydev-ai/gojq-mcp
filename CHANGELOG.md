@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.5] - 2025-10-16
+
+### Added
+- Multi-file support with glob pattern expansion for querying multiple JSON files (#5)
+- File registry system with real-time monitoring using fsnotify (#5)
+- Authentication package with bearer token support for HTTP/SSE transports (#5)
+- Configuration package for YAML-based server configuration (#5)
+- CLI support for multiple file inputs with `-f` flag (#5)
+- Comprehensive USAGE_GUIDE.md with detailed examples and best practices (#5)
+- DEVELOPMENT.md with contributor guidelines and testing instructions (#5)
+- Marketing firm example dataset with synthetic data generator (#5)
+- File change notifications to MCP clients via registry system (#5)
+- Modular package structure (auth, config, jq, registry, server, cli) (#5)
+
+### Changed
+- Refactored main.go to use modular architecture with separate packages (#5)
+- Enhanced jq package with multi-file execution support using `inputs` function (#5)
+- Updated CLI mode to accept multiple file patterns and expand globs (#5)
+- Improved README with expanded examples and transport configuration (#5)
+- Reorganized example files with new directory structure (#5)
+
+### Fixed
+- Configuration loading now properly handles auth tokens from YAML (#5)
+- Improved error messages for file validation and access issues (#5)
+
 ## [1.0.3] - 2025-10-13
 
 ### Added
@@ -46,7 +71,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Comprehensive test suite
 - Release scripts with changelog integration
 
-[Unreleased]: https://github.com/berrydev-ai/gojq-mcp/compare/v1.0.3...HEAD
+[Unreleased]: https://github.com/berrydev-ai/gojq-mcp/compare/v1.0.5...HEAD
+[1.0.5]: https://github.com/berrydev-ai/gojq-mcp/compare/v1.0.3...v1.0.5
 [1.0.3]: https://github.com/berrydev-ai/gojq-mcp/compare/v1.0.2...v1.0.3
 [1.0.2]: https://github.com/berrydev-ai/gojq-mcp/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/berrydev-ai/gojq-mcp/compare/v1.0.0...v1.0.1
