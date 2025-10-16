@@ -1,6 +1,7 @@
 # Makefile for examples
 
 # Variables
+GOJQ_MCP=../dist/gojq-mcp
 DATA_DIR=./data
 CONFIG_FILE=config.yaml
 
@@ -11,12 +12,12 @@ CONFIG_FILE=config.yaml
 # Run the sample CLI mode with the default config
 .PHONY: run-cli-sample
 run-cli-sample:
-	go run ../main.go -f $(DATA_DIR)/sample.json -q '.'
+	$(GOJQ_MCP) -f $(DATA_DIR)/sample.json -q '.'
 
 # Run the sample CLI mode with the custom config
 .PHONY: run-cli-sample-with-config
 run-cli-sample-with-config:
-	go run ../main.go -f $(DATA_DIR)/sample.json -q '.' -c $(CONFIG_FILE)
+	$(GOJQ_MCP) -f $(DATA_DIR)/sample.json -q '.' -c $(CONFIG_FILE)
 
 # ------------------------------------------------------------
 # HTTP server mode
@@ -25,12 +26,12 @@ run-cli-sample-with-config:
 # Run the streaming http server mode with the default config
 .PHONY: run-http-server
 run-http-server:
-	go run ../main.go -t http -p $(DATA_DIR)
+	$(GOJQ_MCP) -t http -p $(DATA_DIR)
 
 # Run the SSE server mode with the custom config
-.PHONY: run-http-server-with-config
-run-http-server-with-config:
-	go run ../main.go -t http -c $(CONFIG_FILE)
+.PHONY: run-http-server-with-config-and-auth
+run-http-server-with-config-and-auth:
+	$(GOJQ_MCP) -t http -c $(CONFIG_FILE)
 
 # ------------------------------------------------------------
 # SSE server mode - This transport is deprecated,
@@ -40,9 +41,9 @@ run-http-server-with-config:
 # Run the SSE server mode with the default config
 .PHONY: run-sse-server
 run-sse-server:
-	go run ../main.go -t sse -p $(DATA_DIR)
+	$(GOJQ_MCP) -t sse -p $(DATA_DIR)
 
 # Run the SSE server mode with the custom config
 .PHONY: run-sse-server-with-config
 run-sse-server-with-config:
-	go run ../main.go -t sse -c $(CONFIG_FILE)
+	$(GOJQ_MCP) -t sse -c $(CONFIG_FILE)

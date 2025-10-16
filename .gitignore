@@ -46,3 +46,6 @@ raft_state.json
 
 # Reference documentation
 docs/mcp-go
+
+# Development files
+config.yml
