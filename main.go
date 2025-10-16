@@ -26,8 +26,8 @@ MODES:
    Generate Config:  gojq-mcp generate-config -p <path> [-o <output>]
 
 OPTIONS:
-   -f <file>       Path to JSON file (CLI mode)
-   -q <query>      jq query to execute (CLI mode)
+    -f <file>       Path to JSON file (CLI mode, can be used multiple times)
+    -q <query>      jq query to execute (CLI mode)
    -p <path>       Path to folder containing JSON files
    -c <config>     Path to YAML configuration file (Server mode)
    -i <instructions> Server instructions for LLM (overrides config)
@@ -46,17 +46,23 @@ FEATURES:
    • HTTP streaming transport for push notifications
 
 EXAMPLES:
-   # Generate a config file
-   gojq-mcp generate-config -p ./data -o config.yaml
+    # Generate a config file
+    gojq-mcp generate-config -p ./data -o config.yaml
 
-   # CLI mode - query a JSON file
-   gojq-mcp -f data.json -q '.users[] | select(.age > 30)'
+    # CLI mode - query a single JSON file
+    gojq-mcp -f data.json -q '.users[] | select(.age > 30)'
 
-   # Server mode with config file
-   gojq-mcp -p ./data -c config.yaml
+    # CLI mode - query multiple specific files
+    gojq-mcp -f file1.json -f file2.json -q '.transactions[] | .amount | add'
 
-   # Server mode with CLI overrides
-   gojq-mcp -p ./data -c config.yaml -t http -a :9000
+    # CLI mode - query files using glob patterns
+    gojq-mcp -f './data/*.json' -q '.transactions[] | .amount | add'
+
+    # Server mode with config file
+    gojq-mcp -p ./data -c config.yaml
+
+    # Server mode with CLI overrides
+    gojq-mcp -p ./data -c config.yaml -t http -a :9000
 
 DOCUMENTATION:
    https://github.com/berrydev-ai/gojq-mcp
@@ -67,7 +73,7 @@ DOCUMENTATION:
 func main() {
 	flag.Usage = printUsage
 
-	filePath := flag.String("f", "", "Path to JSON file")
+	filePaths := make([]string, 0)
 	query := flag.String("q", "", "jq query to execute")
 	dataPath := flag.String("p", "", "Path to folder containing JSON files")
 	configPath := flag.String("c", "", "Path to YAML configuration file")
@@ -77,7 +83,26 @@ func main() {
 	tokenFlag := flag.String("token", "", "Bearer token required by http/sse transports")
 	enableWatch := flag.Bool("watch", true, "Enable file system watching")
 	showVersion := flag.Bool("version", false, "Display version information")
+
+	// Custom flag parsing to support multiple -f flags
+	// We need to parse -f flags manually since Go's flag package doesn't support repeated flags
+	// Extract -f flags and remove them from args before calling flag.Parse()
+	args := os.Args[1:]
+	filteredArgs := make([]string, 0, len(args))
+	for i := 0; i < len(args); i++ {
+		if args[i] == "-f" && i+1 < len(args) {
+			filePaths = append(filePaths, args[i+1])
+			i++ // Skip the next argument since we consumed it
+		} else {
+			filteredArgs = append(filteredArgs, args[i])
+		}
+	}
+
+	// Temporarily replace os.Args for flag.Parse()
+	oldArgs := os.Args
+	os.Args = append([]string{os.Args[0]}, filteredArgs...)
 	flag.Parse()
+	os.Args = oldArgs
 
 	if *showVersion {
 		fmt.Printf("gojq-mcp version %s\n", version)
@@ -87,8 +112,8 @@ func main() {
 	authToken := strings.TrimSpace(*tokenFlag)
 
 	// CLI mode
-	if *filePath != "" && *query != "" {
-		cli.RunCLIMode(*filePath, *query)
+	if len(filePaths) > 0 && *query != "" {
+		cli.RunCLIMode(filePaths, *query)
 		return
 	}
 

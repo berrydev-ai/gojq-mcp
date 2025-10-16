@@ -87,25 +87,34 @@ The default mode runs as an MCP server using stdio transport, perfect for integr
 
 ### HTTP and SSE Transports
 
-When running the server over HTTP or SSE, provide a default JSON document so requests can omit `json_file_path`:
-
 ```bash
-gojq-mcp -t http --default-json-file /absolute/path/to/sample.json
-gojq-mcp -t sse --default-json-file /absolute/path/to/sample.json
-```
+# streaming http mode
+gojq-mcp -t http -p ./examples/data
 
-Individual requests can still override the path; stdio transport continues to require `json_file_path` explicitly.
+# sse mode
+gojq-mcp -t sse -p ./examples/data
+```
 
 ### CLI Mode (Coming Soon)
 
-Direct command-line execution is planned for future releases:
+The CLI mode lets you run jq queries directly on local JSON files, ideal for one-off filtering and exploration.
+Pass the file path and query using `-f` and `-q` flags:
+
+- Reads input from a JSON file
+- Applies the provided jq filter
+- Prints the result to stdout
+
+See [examples/data/sample.json](examples/data/sample.json) for sample data.
+
 
 ```bash
-# Proposed usage
-./gojq-mcp -file data.json -query '.users[] | select(.age > 30)'
+gojq-mcp -f ./examples/data/sample.json -q '.users[] | .name'
+```
 
-# Short flags
-./gojq-mcp -f data.json -q '.[] | .name'
+You can also run jq queries across multiple files:
+
+```bash
+
 ```
 
 ## Architecture

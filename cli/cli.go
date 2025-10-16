@@ -1,28 +1,46 @@
 package cli
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 
 	"github.com/berrydev-ai/gojq-mcp/jq"
 )
 
-// RunCLIMode executes jq query on a single file in CLI mode
-func RunCLIMode(filePath, query string) {
-	data, err := os.ReadFile(filePath)
+// RunCLIMode executes jq query on files in CLI mode
+func RunCLIMode(filePaths []string, query string) {
+	if len(filePaths) == 0 {
+		fmt.Fprintf(os.Stderr, "Error: no file paths provided\n")
+		os.Exit(1)
+	}
+
+	// Expand glob patterns in file paths
+	expandedPaths, err := jq.ExpandGlobPatterns(filePaths)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error reading file: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Error expanding glob patterns: %v\n", err)
 		os.Exit(1)
 	}
 
-	var jsonData interface{}
-	if err := json.Unmarshal(data, &jsonData); err != nil {
-		fmt.Fprintf(os.Stderr, "Error parsing JSON: %v\n", err)
+	if len(expandedPaths) == 0 {
+		fmt.Fprintf(os.Stderr, "Error: no files found matching the provided patterns\n")
 		os.Exit(1)
 	}
 
-	result, err := jq.ExecuteJQ(query, jsonData)
+	// Validate and read all JSON files
+	jsonDataList, err := jq.ValidateAndReadJSONFiles(expandedPaths)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error reading files: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Execute query based on number of files
+	var result string
+	if len(jsonDataList) == 1 {
+		result, err = jq.ExecuteJQ(query, jsonDataList[0])
+	} else {
+		result, err = jq.ExecuteJQMultiFiles(query, jsonDataList)
+	}
+
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error executing jq query: %v\n", err)
 		os.Exit(1)

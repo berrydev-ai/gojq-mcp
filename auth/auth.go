@@ -6,8 +6,8 @@ import (
 	"strings"
 )
 
-// extractBearerToken extracts the bearer token from an Authorization header
-func extractBearerToken(header string) (string, bool) {
+// ExtractBearerToken extracts the bearer token from an Authorization header
+func ExtractBearerToken(header string) (string, bool) {
 	const bearerPrefix = "Bearer "
 	if header == "" {
 		return "", false
@@ -38,7 +38,7 @@ func AuthorizeHTTPBearer(expected string, r *http.Request) bool {
 	if expected == "" {
 		return true
 	}
-	candidate, ok := extractBearerToken(r.Header.Get("Authorization"))
+	candidate, ok := ExtractBearerToken(r.Header.Get("Authorization"))
 	if !ok {
 		return false
 	}
@@ -53,7 +53,7 @@ func AuthorizeSSEToken(expected string, r *http.Request) bool {
 	if tokensMatch(expected, r.URL.Query().Get("token")) {
 		return true
 	}
-	if candidate, ok := extractBearerToken(r.Header.Get("Authorization")); ok {
+	if candidate, ok := ExtractBearerToken(r.Header.Get("Authorization")); ok {
 		return tokensMatch(expected, candidate)
 	}
 	return false
