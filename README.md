@@ -56,17 +56,17 @@ A dual-mode JSON query tool that operates both as an **MCP (Model Context Protoc
 
 See [releases](https://github.com/berrydev-ai/gojq-mcp/releases/latest) for the latest binary builds.
 
-The current release is [v1.0.4](https://github.com/berrydev-ai/gojq-mcp/releases/tag/v1.0.4).
+The current release is [v1.0.5](https://github.com/berrydev-ai/gojq-mcp/releases/tag/v1.0.5).
 
-- [Apple Silicon](https://github.com/berrydev-ai/gojq-mcp/releases/download/v1.0.4/gojq-mcp-darwin-amd64)
-- [Apple Intel](https://github.com/berrydev-ai/gojq-mcp/releases/download/v1.0.4/gojq-mcp-darwin-arm64)
-- [Linux AMD](https://github.com/berrydev-ai/gojq-mcp/releases/download/v1.0.4/gojq-mcp-linux-amd64)
-- [Linux ARM](https://github.com/berrydev-ai/gojq-mcp/releases/download/v1.0.4/gojq-mcp-linux-arm64)
-- [Windows](https://github.com/berrydev-ai/gojq-mcp/releases/download/v1.0.4/gojq-mcp-windows-amd64.exe)
+- [Apple Silicon](https://github.com/berrydev-ai/gojq-mcp/releases/download/v1.0.5/gojq-mcp-darwin-amd64)
+- [Apple Intel](https://github.com/berrydev-ai/gojq-mcp/releases/download/v1.0.5/gojq-mcp-darwin-arm64)
+- [Linux AMD](https://github.com/berrydev-ai/gojq-mcp/releases/download/v1.0.5/gojq-mcp-linux-amd64)
+- [Linux ARM](https://github.com/berrydev-ai/gojq-mcp/releases/download/v1.0.5/gojq-mcp-linux-arm64)
+- [Windows](https://github.com/berrydev-ai/gojq-mcp/releases/download/v1.0.5/gojq-mcp-windows-amd64.exe)
 
 ```bash
 # Download the latest binary
-wget https://github.com/berrydev-ai/gojq-mcp/releases/download/v1.0.4/gojq-mcp-darwin-arm64
+wget https://github.com/berrydev-ai/gojq-mcp/releases/download/v1.0.5/gojq-mcp-darwin-arm64
 
 # Move the binary to your PATH
 mv ./gojq-mcp-darwin-arm64 /usr/loca/bin/gojq-mcp
