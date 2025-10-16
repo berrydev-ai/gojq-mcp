@@ -39,3 +39,6 @@ run-sse:
 
 run-sse-custom:
 	go run . -t sse -a :9000
+
+run-marketing-firm-example: build
+	cd examples/marketing-firm && ../../dist/gojq-mcp -c ./config.yml
