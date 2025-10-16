@@ -5,17 +5,24 @@ A dual-mode JSON query tool that operates both as an **MCP (Model Context Protoc
 ## Features
 
 - 🔍 **Execute jq queries** on JSON files with full jq syntax support
+- 📁 **Multi-file support**: Query multiple files with glob patterns using `inputs`
 - ✅ **Comprehensive validation**: file existence, readability, and JSON validity
 - 🔄 **Dual mode operation**: Run as MCP server or CLI tool
-- 🧪 **Well-tested**: 14 comprehensive test cases for the core query engine
-- 📦 **Zero configuration**: Works out of the box
+- 🔐 **Bearer token authentication**: Secure HTTP and SSE transports
+- ⚙️ **YAML configuration**: Configure transport, prompts, and instructions
+- 📡 **Real-time file monitoring**: Automatic client notifications on file changes
+- 🌐 **Multiple transports**: stdio, HTTP streaming, and SSE
+- 🧪 **Well-tested**: 30+ comprehensive test cases across all packages
+- 📦 **Zero configuration**: Works out of the box with sensible defaults
 
 ## Table of Contents
 
 - [Installation](#installation)
 - [Usage](#usage)
   - [MCP Server Mode](#mcp-server-mode)
-  - [CLI Mode](#cli-mode-coming-soon)
+  - [CLI Mode](#cli-mode)
+  - [HTTP and SSE Transports](#http-and-sse-transports)
+  - [Configuration Files](#configuration-files)
 - [Architecture](#architecture)
 - [MCP Tool Interface](#mcp-tool-interface)
 - [Development](#development)
@@ -27,6 +34,29 @@ A dual-mode JSON query tool that operates both as an **MCP (Model Context Protoc
 - [License](#license)
 
 ## Installation
+
+### Download binary
+
+See [releases](https://github.com/berrydev-ai/gojq-mcp/releases/latest) for the latest binary builds.
+
+The current release is [v1.0.4](https://github.com/berrydev-ai/gojq-mcp/releases/tag/v1.0.4).
+
+- [Apple Silicon](https://github.com/berrydev-ai/gojq-mcp/releases/download/v1.0.4/gojq-mcp-darwin-amd64)
+- [Apple Intel](https://github.com/berrydev-ai/gojq-mcp/releases/download/v1.0.4/gojq-mcp-darwin-arm64)
+- [Linux AMD](https://github.com/berrydev-ai/gojq-mcp/releases/download/v1.0.4/gojq-mcp-linux-amd64)
+- [Linux ARM](https://github.com/berrydev-ai/gojq-mcp/releases/download/v1.0.4/gojq-mcp-linux-arm64)
+- [Windows](https://github.com/berrydev-ai/gojq-mcp/releases/download/v1.0.4/gojq-mcp-windows-amd64.exe)
+
+```bash
+# Download the latest binary
+wget https://github.com/berrydev-ai/gojq-mcp/releases/download/v1.0.4/gojq-mcp-darwin-arm64
+
+# Move the binary to your PATH
+mv ./gojq-mcp-darwin-arm64 /usr/loca/bin/gojq-mcp
+
+# Try it out
+gojq-mcp -h
+```
 
 ### From Source
 
@@ -61,13 +91,29 @@ The default mode runs as an MCP server using stdio transport, perfect for integr
 
 **Configure in Claude Desktop** (`~/Library/Application Support/Claude/claude_desktop_config.json`):
 
+**stdio**
+
 ```json
 {
   "mcpServers": {
-    "gojq": {
-      "command": "/absolute/path/to/dist/gojq-mcp",
-      "args": []
+    "gojq-mcp": {
+      "command": "gojq-mcp",
     }
+  }
+}
+```
+
+**streaming http**
+
+```json
+{
+  "mcpServers": {
+    "command": "npx",
+    "args": [
+      "-y",
+      "mcp-remote",
+      "http://my-server.com:8080/mcp"
+    ]
   }
 }
 ```
@@ -85,36 +131,89 @@ The default mode runs as an MCP server using stdio transport, perfect for integr
 }
 ```
 
-### HTTP and SSE Transports
-
-```bash
-# streaming http mode
-gojq-mcp -t http -p ./examples/data
-
-# sse mode
-gojq-mcp -t sse -p ./examples/data
-```
-
-### CLI Mode (Coming Soon)
+### CLI Mode
 
 The CLI mode lets you run jq queries directly on local JSON files, ideal for one-off filtering and exploration.
-Pass the file path and query using `-f` and `-q` flags:
+Pass file paths and query using `-f` and `-q` flags:
 
-- Reads input from a JSON file
-- Applies the provided jq filter
-- Prints the result to stdout
-
-See [examples/data/sample.json](examples/data/sample.json) for sample data.
-
+**Query a single file:**
 
 ```bash
 gojq-mcp -f ./examples/data/sample.json -q '.users[] | .name'
 ```
 
-You can also run jq queries across multiple files:
+**Query multiple specific files:**
 
 ```bash
+gojq-mcp -f ./examples/data/multiple-files/2025-01/01.json \
+         -f ./examples/data/multiple-files/2025-01/02.json \
+         -q '[inputs.transactions[]] | map(.amount) | add'
+```
 
+**Query files using glob patterns:**
+
+```bash
+# Query all JSON files in a directory
+gojq-mcp -f './examples/data/multiple-files/2025-01/*.json' \
+         -q '[inputs.transactions[]] | map(.amount) | add'
+
+# Query across multiple months
+gojq-mcp -f './examples/data/multiple-files/*/*.json' \
+         -q '[inputs.transactions[] | select(.category == "services")] | length'
+```
+
+**Features:**
+
+- Supports glob patterns for matching multiple files
+- Uses `inputs` function for multi-file queries
+- Automatic file validation (existence, readability, JSON validity)
+- Output printed to stdout
+
+See [examples/data/sample.json](examples/data/sample.json) and [examples/data/multiple-files/](examples/data/multiple-files/) for sample data.
+
+### HTTP and SSE Transports
+
+Start the server with HTTP or SSE transport for web-based integrations:
+
+```bash
+# HTTP streaming mode
+gojq-mcp -t http -p ./examples/data -a :8080
+
+# SSE mode with authentication
+gojq-mcp -t sse -p ./examples/data -a :8080 -token your-secret-token
+
+# With configuration file
+gojq-mcp -p ./examples/data -c examples/config.http.yaml
+```
+
+### Configuration Files
+
+Create a YAML configuration file to customize server behavior:
+
+```yaml
+# config.yaml
+
+server:
+  name: My Data Server
+  version: 1.0.0
+  transport: http
+  port: 8080
+  data_path: ./examples/data
+  instructions: "Custom instructions for the LLM client"
+
+prompts:
+  - name: analyze_transactions
+    description: "Analyze transaction data"
+    arguments:
+      - name: month
+        description: "Month to analyze (e.g., 2025-01)"
+        required: true
+```
+
+Start the server with your config:
+
+```bash
+gojq-mcp -c config.yaml
 ```
 
 ## Architecture
@@ -123,98 +222,227 @@ You can also run jq queries across multiple files:
 
 ```
 gojq-mcp/
-├── main.go                 # Application entry point & MCP server setup
-├── main_test.go           # Comprehensive tests for executeJQ
-├── go.mod                 # Go module definition
-├── go.sum                 # Dependency checksums
-├── README.md              # This file
-├── LICENSE                # MIT License
-├── CLAUDE.md              # AI assistant guidance
-├── Makefile               # Build automation
-├── examples/              # Example JSON files
-│   └── sample.json
-├── tests/                 # Test infrastructure
-│   ├── main_test.go       # (stub for future tests)
-│   └── testdata/          # Test fixtures
+├── main.go                    # Application entry point & mode routing
+├── main_test.go               # Integration tests
+├── go.mod                     # Go module definition
+├── go.sum                     # Dependency checksums
+├── README.md                  # This file
+├── LICENSE                    # MIT License
+├── Makefile                   # Build automation
+├── CHANGELOG.md               # Version history
+├── auth/                      # Authentication package
+│   ├── auth.go                # Bearer token auth logic
+│   └── auth_test.go           # Auth tests (10 test cases)
+├── cli/                       # CLI mode package
+│   ├── cli.go                 # CLI execution logic
+│   └── cli_test.go            # CLI tests (3 test cases)
+├── config/                    # Configuration package
+│   ├── config.go              # YAML config loading
+│   └── config_test.go         # Config tests (4 test cases)
+├── jq/                        # jq query execution package
+│   ├── jq.go                  # Core query engine
+│   └── jq_test.go             # jq tests (not in main_test.go)
+├── registry/                  # File registry & watching
+│   ├── registry.go            # File system monitoring
+│   └── registry_test.go       # Registry tests
+├── server/                    # MCP server package
+│   ├── server.go              # MCP server setup & tools
+│   └── server_test.go         # Server tests
+├── examples/                  # Example data & configs
+│   ├── data/
+│   │   ├── sample.json        # Single-file example
+│   │   └── multiple-files/    # Multi-file examples
+│   │       ├── 2025-01/       # Monthly transaction data
+│   │       └── 2025-02/
+│   ├── config.yaml            # stdio config example
+│   ├── config.http.yaml       # HTTP config example
+│   └── config.sse.yaml        # SSE config example
+├── tests/                     # Test infrastructure
+│   ├── main_test.go
+│   └── testdata/              # Test fixtures
 │       ├── valid.json
 │       ├── invalid.json
 │       └── nested.json
-└── dist/                  # Build output (gitignored)
+├── scripts/                   # Release automation
+│   ├── release.sh
+│   └── release-ci.sh
+└── dist/                      # Build output (gitignored)
     └── gojq-mcp
 ```
 
 ### Core Components
 
-#### `executeJQ(jqFilter string, jsonData interface{}) (string, error)`
+#### Package: `jq/`
 
-The heart of the application. Parses and executes jq filters using gojq.
+Core jq query execution engine with support for single and multiple files.
+
+**Key Functions:**
+
+- `ExecuteJQ(jqFilter, jsonData)` - Execute query on single JSON object
+- `ExecuteJQMultiFiles(jqFilter, jsonData[])` - Execute query across multiple files using `inputs`
+- `ExpandGlobPatterns(patterns)` - Expand glob patterns to file paths
+- `ValidateAndReadJSONFiles(filePaths)` - Validate and load JSON files
+- `ProcessJQQuery(jqFilter, patterns, dataPath)` - End-to-end query processing
+
+**Tested:** 14 test cases in `main_test.go` covering queries, multi-file operations, glob expansion, and validation
+
+#### Package: `cli/`
+
+CLI mode execution logic for running jq queries from the command line.
 
 **Features:**
-- Parses jq filter syntax
-- Executes queries on parsed JSON data
-- Returns single results directly, multiple results as arrays
-- Handles errors gracefully with detailed messages
 
-**Location:** `main.go:15-54`
+- Single and multi-file query execution
+- Glob pattern support
+- Automatic mode selection (single vs. multi-file)
+- Error handling with user-friendly messages
 
-#### `main()`
+**Tested:** 3 test cases covering single-file, multi-file, and glob pattern scenarios
 
-Initializes the MCP server and registers the `run_jq` tool.
+#### Package: `auth/`
 
-**Validation sequence:**
-1. File existence check
-2. File readability verification
-3. JSON validity validation
-4. jq filter execution
+Bearer token authentication for HTTP and SSE transports.
 
-**Location:** `main.go:56-130`
+**Key Functions:**
+
+- `ExtractBearerToken(header)` - Parse Authorization header
+- `AuthorizeHTTPBearer(expected, request)` - Validate HTTP bearer token
+- `AuthorizeSSEToken(expected, request)` - Validate SSE token (query param or header)
+- `WriteUnauthorized(writer)` - Send 401 response
+
+**Tested:** 10 test cases covering token extraction, matching, and authorization
+
+#### Package: `config/`
+
+YAML configuration file loading and parsing.
+
+**Configuration Options:**
+
+- `data_path` - Directory containing JSON files
+- `transport` - Transport type (stdio, http, sse)
+- `port` - Server port for http/sse
+- `instructions` - Custom instructions for LLM clients
+- `prompts` - Reusable prompt templates
+
+**Tested:** 4 test cases covering valid configs, defaults, and error handling
+
+#### Package: `registry/`
+
+File system registry with real-time monitoring and change notifications.
+
+**Features:**
+
+- Watch directory for file changes
+- Notify MCP clients of updates via push notifications
+- Maintain file metadata and state
+
+#### Package: `server/`
+
+MCP server setup with tool registration and transport configuration.
+
+**MCP Tools:**
+
+- `run_jq` - Execute jq queries on files in the data directory
+- Support for file patterns and glob matching
+
+#### `main.go`
+
+Application entry point that routes to CLI or server mode based on flags.
+
+**Responsibilities:**
+
+1. Parse command-line flags
+2. Route to CLI mode (if `-f` and `-q` provided)
+3. Load configuration (YAML or defaults)
+4. Initialize file registry
+5. Setup and start MCP server
+6. Enable file watching (if requested)
 
 ## MCP Tool Interface
 
 ### Tool: `run_jq`
 
-Query JSON files using jq filter syntax.
+Query JSON files using jq filter syntax with support for single and multiple files.
 
 **Parameters:**
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `jq_filter` | string | ✅ Yes | The jq filter to execute (e.g., `.users[] \| .name`) |
-| `json_file_path` | string | ✅ Yes | Absolute path to the JSON file to process |
+| `file_patterns` | array[string] | ✅ Yes | Array of file patterns (relative to data path, supports globs) |
 
 **Return Value:**
+
 - Success: JSON-formatted string containing query results
 - Error: Descriptive error message
 
-**Example Request:**
+**Single File Example:**
 
 ```json
 {
   "jq_filter": ".users[] | select(.age > 30)",
-  "json_file_path": "/absolute/path/to/data.json"
+  "file_patterns": ["sample.json"]
 }
 ```
 
-**Example Response:**
+**Response:**
+
+```json
+[
+  {
+    "name": "Bob",
+    "age": 35,
+    "email": "bob@example.com"
+  }
+]
+```
+
+**Multi-File Example with Glob:**
 
 ```json
 {
-  "name": "Bob",
-  "age": 35,
-  "email": "bob@example.com"
+  "jq_filter": "[inputs.transactions[]] | map(.amount) | add",
+  "file_patterns": ["multiple-files/2025-01/*.json"]
 }
 ```
+
+**Response:**
+
+```json
+225.50
+```
+
+**Multi-File Example with Specific Files:**
+
+```json
+{
+  "jq_filter": "[inputs.transactions[] | select(.category == \"services\")] | length",
+  "file_patterns": [
+    "multiple-files/2025-01/01.json",
+    "multiple-files/2025-01/02.json"
+  ]
+}
+```
+
+**Key Features:**
+
+- 🌐 **Glob pattern support**: Use wildcards to match multiple files
+- 🔗 **Multi-file queries**: Use `inputs` to process multiple files
+- 🔒 **Path security**: All paths are restricted to the configured data directory
+- ✅ **Automatic validation**: Files are validated before processing
 
 ### Error Handling
 
 The tool provides detailed error messages for:
 
-- **File not found**: `"file does not exist: /path/to/file.json"`
-- **Directory instead of file**: `"path is a directory, not a file: /path/to/dir"`
-- **Permission denied**: `"file is not readable: permission denied"`
-- **Invalid JSON**: `"file does not contain valid JSON: invalid character..."`
+- **File not found**: `"file does not exist: filename.json"`
+- **Directory instead of file**: `"path is a directory, not a file: dirname"`
+- **Permission denied**: `"file filename.json is not readable: permission denied"`
+- **Invalid JSON**: `"file filename.json does not contain valid JSON: invalid character..."`
 - **Invalid jq filter**: `"invalid jq filter: unexpected token..."`
 - **Query execution error**: `"jq execution error: ..."`
+- **No matching files**: `"no files found matching the provided patterns"`
+- **Path outside data directory**: `"access denied: path X is outside data directory"`
 
 ## Development
 
@@ -236,17 +464,29 @@ go build -o dist/gojq-mcp .
 ### Running
 
 ```bash
-# MCP server mode (default)
+# MCP server mode (default - stdio)
 make run-server
 # or
-./dist/gojq-mcp
+./dist/gojq-mcp -p ./examples/data
 
-# CLI mode (when implemented)
-make run-cli
+# CLI mode - single file
+./dist/gojq-mcp -f ./examples/data/sample.json -q '.users[].name'
 
-# HTTP/SSE transport server with default data
-go run . -t http --default-json-file $(pwd)/examples/sample.json
-go run . -t sse --default-json-file $(pwd)/examples/sample.json
+# CLI mode - multiple files with glob
+./dist/gojq-mcp -f './examples/data/multiple-files/*/*.json' \
+                -q '[inputs.transactions[]] | length'
+
+# HTTP transport server
+./dist/gojq-mcp -t http -p ./examples/data -a :8080
+
+# SSE transport server with authentication
+./dist/gojq-mcp -t sse -p ./examples/data -a :8080 -token mysecret
+
+# Server with config file
+./dist/gojq-mcp -c examples/config.yaml
+
+# Disable file watching
+./dist/gojq-mcp -p ./examples/data -watch=false
 ```
 
 ### Cleaning
@@ -264,6 +504,7 @@ The project uses GitHub Actions to automatically build and publish releases for 
 **Steps to create a release:**
 
 1. **Commit your changes:**
+
    ```bash
    git add .
    git commit -m "Prepare release v1.0.0"
@@ -271,6 +512,7 @@ The project uses GitHub Actions to automatically build and publish releases for 
    ```
 
 2. **Create and push a version tag:**
+
    ```bash
    # Create a tag following semantic versioning
    git tag v1.0.0
@@ -298,6 +540,7 @@ Each release includes binaries for:
 Binaries are named: `gojq-mcp-{version}-{os}-{arch}`
 
 For example, version `v1.0.0` produces:
+
 - `gojq-mcp-v1.0.0-linux-amd64`
 - `gojq-mcp-v1.0.0-linux-arm64`
 - `gojq-mcp-v1.0.0-darwin-amd64`
@@ -325,11 +568,13 @@ Follow [Semantic Versioning](https://semver.org/):
 The project includes two GitHub Actions workflows:
 
 **Test Workflow** (`.github/workflows/test.yml`):
+
 - Runs on pushes and pull requests to `main`/`master`
 - Tests against Go 1.24 and 1.25 (all currently supported versions)
 - Ensures compatibility across supported Go versions
 
 **Build Workflow** (`.github/workflows/build.yml`):
+
 - Triggers only on version tags (e.g., `v*`)
 - Builds for all supported platforms
 - Creates GitHub Release with binaries attached
@@ -337,7 +582,7 @@ The project includes two GitHub Actions workflows:
 
 ## Testing
 
-The project includes comprehensive tests for the core `executeJQ` function.
+The project includes comprehensive tests across all packages with 30+ test cases.
 
 ### Running Tests
 
@@ -348,29 +593,66 @@ make test
 # Run with verbose output
 go test -v ./...
 
+# Run specific package tests
+go test -v ./jq
+go test -v ./auth
+go test -v ./cli
+go test -v ./config
+
 # Run specific test
 go test -v -run TestExecuteJQ_SimpleQuery
+
+# Run with coverage
+go test -cover ./...
 ```
 
 ### Test Coverage
 
-14 test cases covering:
+**Package: `jq` (14 test cases in `main_test.go`)**
 
-✅ **Basic queries**: `.name`, `.age`, nested access
-✅ **Array operations**: Access, mapping, filtering
-✅ **Advanced filters**: `select()`, pipe operations
-✅ **Built-in functions**: `keys`, `length`, `type`
-✅ **Error handling**: Invalid filters, non-existent keys
-✅ **Edge cases**: Empty arrays, identity filter, null values
-✅ **Complex scenarios**: Nested data structures, multiple results
+- ✅ Basic queries: `.name`, `.age`, nested access
+- ✅ Array operations: Access, mapping, filtering
+- ✅ Advanced filters: `select()`, pipe operations
+- ✅ Built-in functions: `keys`, `length`, `type`
+- ✅ Error handling: Invalid filters, non-existent keys
+- ✅ Edge cases: Empty arrays, identity filter
+- ✅ Complex scenarios: Nested data structures, multiple results
+- ✅ Multi-file operations: `inputs`, glob expansion
+- ✅ File validation: Existence, readability, JSON validity
 
-**Test files:**
-- `main_test.go`: Core executeJQ function tests
+**Package: `auth` (10 test cases)**
+
+- ✅ Bearer token extraction
+- ✅ Token matching logic
+- ✅ HTTP bearer authorization
+- ✅ SSE token authorization (query param and header)
+- ✅ Case-insensitive bearer scheme
+- ✅ Empty token handling
+- ✅ Unauthorized response generation
+
+**Package: `cli` (3 test cases)**
+
+- ✅ Single file query execution
+- ✅ Multiple file query execution
+- ✅ Glob pattern expansion and execution
+
+**Package: `config` (4 test cases)**
+
+- ✅ Valid YAML config loading
+- ✅ Default value application
+- ✅ Invalid YAML handling
+- ✅ Nonexistent file error handling
+
+**Test Infrastructure:**
+
+- `main_test.go`: Integration tests for core functionality
+- `*/.*_test.go`: Package-specific unit tests
 - `tests/testdata/`: Test fixtures (valid, invalid, nested JSON)
+- `examples/data/`: Real-world example data for testing
 
 ## Examples
 
-### Basic Queries
+### Basic Queries (Single File)
 
 ```jq
 # Get a single field
@@ -381,11 +663,7 @@ go test -v -run TestExecuteJQ_SimpleQuery
 
 # Array access
 .users[0].name
-```
 
-### Array Operations
-
-```jq
 # Map over array
 .users[] | .name
 
@@ -396,7 +674,7 @@ go test -v -run TestExecuteJQ_SimpleQuery
 [.users[] | .email]
 ```
 
-### Advanced Queries
+### Advanced Queries (Single File)
 
 ```jq
 # Multiple filters
@@ -410,23 +688,85 @@ keys
 
 # Type checking
 .age | type
+
+# Arithmetic operations
+.transactions[] | .amount | add
+```
+
+### Multi-File Queries
+
+When working with multiple files, use the `inputs` function to access all files:
+
+```jq
+# Combine all transactions from multiple files
+[inputs.transactions[]]
+
+# Sum amounts across all files
+[inputs.transactions[]] | map(.amount) | add
+
+# Filter across all files
+[inputs.transactions[] | select(.amount > 100)]
+
+# Count specific items across all files
+[inputs.transactions[] | select(.category == "services")] | length
+
+# Get unique categories across all files
+[inputs.transactions[].category] | unique
+
+# Average amount across all files
+[inputs.transactions[]] | map(.amount) | add / length
+```
+
+### Real-World Examples
+
+**CLI Mode:**
+
+```bash
+# Find all users over 30
+gojq-mcp -f examples/data/sample.json -q '.users[] | select(.age > 30)'
+
+# Total revenue for January 2025
+gojq-mcp -f 'examples/data/multiple-files/2025-01/*.json' \
+         -q '[inputs.transactions[]] | map(.amount) | add'
+
+# Count service transactions across all months
+gojq-mcp -f 'examples/data/multiple-files/*/*.json' \
+         -q '[inputs.transactions[] | select(.category == "services")] | length'
+```
+
+**MCP Tool Mode:**
+
+```json
+{
+  "tool": "run_jq",
+  "arguments": {
+    "jq_filter": "[inputs.transactions[]] | group_by(.category) | map({category: .[0].category, total: map(.amount) | add})",
+    "file_patterns": ["multiple-files/2025-01/*.json"]
+  }
+}
 ```
 
 ### Sample Data
 
-See `examples/sample.json` for a complete example dataset.
+- `examples/data/sample.json` - Users dataset with names, ages, and emails
+- `examples/data/multiple-files/2025-01/` - January transaction data
+- `examples/data/multiple-files/2025-02/` - February transaction data
 
 ## Best Practices
 
 ### For MCP Server Development
 
-1. **Always use absolute paths** when specifying `json_file_path`
-2. **Validate input early**: The tool validates files before processing
+1. **Use relative paths**: File patterns are relative to the configured data directory
+2. **Leverage glob patterns**: Use wildcards to match multiple files efficiently
 3. **Handle errors gracefully**: Check error responses from the tool
 4. **Test queries incrementally**: Start with simple queries and build complexity
 5. **Use the identity filter** (`.`) to inspect data structure first
+6. **Enable file watching**: Get real-time notifications when data files change
+7. **Secure HTTP/SSE**: Always use bearer tokens for HTTP and SSE transports
 
 ### For jq Queries
+
+**Single-File Queries:**
 
 1. **Start simple**: Test with `.` to see full structure
 2. **Use `keys`**: Discover available fields with `keys` function
@@ -434,18 +774,47 @@ See `examples/sample.json` for a complete example dataset.
 4. **Select carefully**: Use `select()` for filtering arrays
 5. **Check types**: Use `type` function to verify data types
 
+**Multi-File Queries:**
+
+1. **Use `inputs` function**: Access all files in multi-file queries
+2. **Wrap in arrays**: Use `[inputs.field[]]` to collect results from all files
+3. **Aggregate with built-ins**: Use `add`, `unique`, `group_by` for cross-file analysis
+4. **Filter before collecting**: `[inputs.items[] | select(.condition)]` is more efficient
+5. **Test with small sets**: Try queries on a few files before expanding to all
+
+### For Configuration
+
+1. **Start with YAML config**: Use configuration files for complex setups
+2. **Set custom instructions**: Guide LLM clients with relevant context
+3. **Define prompts**: Create reusable prompt templates for common tasks
+4. **Override with CLI**: Use CLI flags to test different configurations
+5. **Version control configs**: Store configuration files in your repository
+
 ### For Integration
 
 1. **Restart MCP client** after configuration changes
-2. **Use absolute paths** in MCP server configuration
-3. **Check logs** if the server doesn't appear in your MCP client
-4. **Test manually** with `go run .` before deploying
-5. **Keep dependencies updated** with `go get -u` and `go mod tidy`
+2. **Use absolute binary paths** in MCP server configuration
+3. **Verify data directory**: Ensure the data path exists and contains JSON files
+4. **Check logs** if the server doesn't appear in your MCP client
+5. **Test with Inspector**: Use `@modelcontextprotocol/inspector` to debug MCP integration
+6. **Monitor file changes**: Watch stderr for file change notifications
+7. **Keep dependencies updated** with `go get -u` and `go mod tidy`
+
+### For Security
+
+1. **Restrict data directory**: Only expose necessary JSON files
+2. **Use authentication**: Enable bearer tokens for HTTP/SSE transports
+3. **Validate queries**: Be aware that jq queries can be resource-intensive
+4. **Monitor access**: Log queries in production environments
+5. **Keep tokens secret**: Store bearer tokens in environment variables or secure vaults
 
 ## Dependencies
 
 - [gojq](https://github.com/itchyny/gojq) - Pure Go implementation of jq
 - [mcp-go](https://github.com/mark3labs/mcp-go) - Model Context Protocol server framework
+- [yaml.v3](https://github.com/go-yaml/yaml) - YAML configuration file parsing
+- [fsnotify](https://github.com/fsnotify/fsnotify) - File system change notifications
+- [testify](https://github.com/stretchr/testify) - Testing toolkit with assertions
 
 ## Contributing
 
