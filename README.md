@@ -69,7 +69,7 @@ The current release is [v1.0.4](https://github.com/berrydev-ai/gojq-mcp/releases
 wget https://github.com/berrydev-ai/gojq-mcp/releases/download/v1.0.4/gojq-mcp-darwin-arm64
 
 # Move the binary to your PATH
-mv ./gojq-mcp-darwin-arm64 /usr/loca/bin/gojq-mcp
+mv ./gojq-mcp-darwin-arm64 /usr/local/bin/gojq-mcp
 
 # Try it out
 gojq-mcp -h
